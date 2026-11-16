@@ -1,0 +1,25 @@
+## Interface: 120100, 120105, 16001
+## Title: Sintezza Theme
+## Author: Sintezza
+## X-License: MIT
+## Notes: Shared fonts, artwork and controls for Sintezza addons.
+## Notes-ruRU: Общие шрифты, текстуры и элементы интерфейса для аддонов Sintezza.
+## Version: 1.3.17
+## IconTexture: Interface\AddOns\Sintezza_Theme\Media\Icons\Sintezza_Theme
+## SavedVariables: Sintezza_ThemeDB
+## LoadSavedVariablesFirst: 1
+## OptionalDeps: LibSharedMedia-3.0, SharedMediaAdditionalFonts, FontMagic
+
+Locale.lua
+Fonts.lua
+Theme.lua
+WindowStack.lua
+Controls.lua
+Sliders.lua
+Picker.lua
+Help.lua
+Widgets.lua
+DataTransfer.lua
+WindowOptions.lua
+Minimap.lua
+Settings.lua

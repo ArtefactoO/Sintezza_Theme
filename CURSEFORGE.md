@@ -26,4 +26,8 @@ Theme supplies shared windows, settings widgets, and data-management tools to Si
 
 This addon works on its own. Optional [SharedMedia providers](https://www.curseforge.com/wow/addons/sharedmedia) add fonts to the picker.
 
+### Changelog
+
+[View the release history on GitHub](https://github.com/ArtefactoO/Sintezza_Theme/blob/main/CHANGELOG.md).
+
 Source, installation details, and credits are available on [GitHub](https://github.com/ArtefactoO/Sintezza_Theme).

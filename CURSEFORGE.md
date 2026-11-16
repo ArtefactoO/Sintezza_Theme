@@ -16,7 +16,11 @@ Shared palettes, fonts, and interface controls for Sintezza addons in WoW Foreve
 
 ## Description
 
-Customize the look of supported Sintezza addons from one window. Open `/stheme` or click the minimap button to choose Turquoise, Ember, Copper, Old Gold, Ice, or Amethyst. The palette updates the window background and controls across supported addons.
+Customize the look of supported Sintezza addons from one window.
+
+### Appearance
+
+Open `/stheme` or click the minimap button to choose Turquoise, Ember, Copper, Old Gold, Ice, or Amethyst. The palette updates the window background and controls across supported addons.
 
 Choose separate interface and heading fonts, and toggle decorative effects and animations. English and Russian are available. Game-language mode uses English for other locales. Reload after changing language.
 

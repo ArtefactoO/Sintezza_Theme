@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.18
+
+- Updated the project logo and shared in-game icons for Theme, UI, Disenchant, Loot, and Rivals.
+
+### По-русски
+
+- Обновлены логотип проекта и общие игровые иконки Theme, UI, Disenchant, Loot и Rivals.
+
 ## 1.3.17
 
 - Added a shared pair of high-resolution Alliance and Horde crests for Sintezza signals and faction columns.

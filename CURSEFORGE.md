@@ -7,6 +7,7 @@
 | Flavor and version | Forever 1.60.1 |
 | Main category | Libraries |
 | Additional categories | Artwork |
+| CurseForge relations | None |
 | Project license | MIT. See the repository for third-party notices. |
 
 ## Summary
@@ -23,6 +24,6 @@ Theme supplies shared windows, settings widgets, and data-management tools to Si
 
 ### Requirements
 
-This addon works on its own. Optional SharedMedia providers add fonts to the picker.
+This addon works on its own. Optional [SharedMedia providers](https://www.curseforge.com/wow/addons/sharedmedia) add fonts to the picker.
 
 Source, installation details, and credits are available on [GitHub](https://github.com/ArtefactoO/Sintezza_Theme).

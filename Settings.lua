@@ -1,9 +1,10 @@
 local name, ns = ...
 local fonts = ns.Fonts
 local english = ns:GetLocale() == "enUS"
+local function Text(en, ru) return english and en or ru end
 local title = "Sintezza Theme"
 local minimapButton
-local sharedFont = english and "Shared interface font" or "Общий шрифт интерфейса"
+local sharedFont = Text("Interface font", "Шрифт интерфейса")
 local headingFont = english and "Heading font" or "Шрифт заголовков"
 local palettes = {
     { "BRASS", english and "Teal" or "Бирюза" },
@@ -12,28 +13,52 @@ local palettes = {
     { "FOREVER", english and "Old Gold" or "Старое золото" },
     { "FROST", english and "Ice" or "Лед" },
     { "ARCANE", english and "Amethyst" or "Аметист" },
+    { "GRAPHITE", Text("Graphite", "Графит") },
 }
 
-local panel = CreateFrame("Frame")
-panel.name = title
+local panel = CreateFrame("Frame", "Sintezza_ThemeSettings", UIParent, "BackdropTemplate")
+panel:Hide()
+panel:SetSize(780, 460)
+panel:SetPoint("CENTER")
+panel:SetFrameStrata("DIALOG")
+panel:SetClampedToScreen(true)
+panel:SetMovable(true)
+panel:EnableMouse(true)
+if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = panel:GetName() end
+
 local widgets = ns:CreateWidgets(ns.Settings)
 local theme = ns.Settings
-local shell = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-shell:SetPoint("TOPLEFT", 14, -14)
-shell:SetPoint("TOPRIGHT", -14, -14)
-theme:WindowSurface(shell)
-local header = widgets:WindowHeader(shell, {
-    title = title, icon = ns.icons.Sintezza_Theme, height = 64, titleSize = 22, close = false,
+theme:WindowSurface(panel)
+local header = widgets:WindowHeader(panel, {
+    title = title, addonName = name, icon = ns.icons.Sintezza_Theme,
 })
-local section = CreateFrame("Frame", nil, shell, "BackdropTemplate")
-section:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 12, -12)
-section:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", -12, -12)
-section:SetHeight(27)
-theme:SectionSurface(section)
-local sectionTitle = widgets:Label(section, english and "Palette" or "Палитра", 12, theme.text, "display")
-sectionTitle:SetPoint("LEFT", 10, 0)
+local window = ns:NewWindowPreferences(function() return fonts:GetSettings() end, nil, "settingsWindow")
+header:EnableMouse(true)
+header:RegisterForDrag("LeftButton")
+header:SetScript("OnDragStart", function()
+    if window:CanMove() then panel:StartMoving() end
+end)
+header:SetScript("OnDragStop", function() panel:StopMovingOrSizing() end)
+panel:HookScript("OnHide", function() panel:StopMovingOrSizing() end)
 
+local scroll, shell, bar = widgets:ScrollFrame(panel)
+scroll:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -19, 12)
+bar:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 2, -4)
+bar:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 2, 3)
+local function Section(label)
+    local section = widgets:Section(shell, label, nil, "settings")
+    section:SetHeight(section.headerHeight)
+    return section
+end
+
+local paletteTitle = Section(Text("Color scheme", "Цветовая схема"))
+local buttonTitle = Section(Text("Buttons and background", "Кнопки и фон"))
+local interfaceTitle = Section(Text("Interface", "Интерфейс"))
+local windows = Section(Text("All addon windows", "Окна всех аддонов"))
+local Layout
 local notice = widgets:Label(shell, "", 11, theme.muted)
+notice:SetHeight(16)
 local function RefreshNotice()
     local preference = fonts:GetSettings().locale
     if ns:ResolveLocale(preference) ~= ns:GetLocale() then
@@ -43,6 +68,7 @@ local function RefreshNotice()
     else
         notice:SetText("")
     end
+    if Layout then Layout(scroll, scroll:GetWidth()) end
 end
 local function ApplyAppearance()
     ns:RefreshAppearance()
@@ -61,8 +87,14 @@ local function RefreshMinimap()
         minimapButton:Refresh(settings)
     else
         minimapButton = ns:CreateMinimapButton(name, ns.icons.Sintezza_Theme, settings,
-            function(_, button) if button == "LeftButton" then ns:OpenSettings() end end,
-            function(tooltip) tooltip:AddLine(title) end)
+            {
+                window = function() return panel end,
+                open = function() ns:OpenSettings() end,
+            },
+            function(tooltip)
+                tooltip:AddLine(title)
+                ns:AddMinimapToggleHint(tooltip)
+            end)
     end
 end
 
@@ -117,7 +149,17 @@ local heading = widgets:ChoiceRow(shell, headingFont, HeadingFontChoices,
         fonts:GetSettings().titleFont = value
         ApplyAppearance()
     end, { THEME = 1, SHARED = 2, DEFAULT = 3, COMBAT = 4 })
-local motion = widgets:Toggle(shell, english and "Interface animations and decorative effects" or "Анимации интерфейса и декоративные эффекты",
+local buttonStyle = widgets:ChoiceRow(shell, Text("Button style", "Стиль кнопок"), {
+    BRONZE = Text("Clipped Corners", "Срезанные углы"),
+    STEEL = Text("Fine Edge", "Тонкая кромка"),
+    BRACKETS = Text("Brackets", "Скобы"),
+    WEDGE = Text("Slanted Edge", "Косой край"),
+    COIN = Text("Minted Stamp", "Чеканка"),
+}, function() return ns:GetButtonStyle() end, function(value)
+    ns:SetButtonStyle(value)
+    RefreshNotice()
+end, { BRONZE = 1, STEEL = 2, BRACKETS = 3, WEDGE = 4, COIN = 5 })
+local motion = widgets:Toggle(shell, Text("Animations and effects", "Анимации и эффекты"),
     function() return fonts:GetSettings().animateControls ~= false end,
     function(value)
         fonts:GetSettings().animateControls = value
@@ -136,49 +178,149 @@ end, function(value)
     fonts:GetSettings().locale = value ~= "auto" and value or nil
     RefreshNotice()
 end, { auto = 1, ruRU = 2, enUS = 3 })
-local minimap = widgets:Toggle(shell, english and "Minimap button" or "Кнопка у миникарты",
+local minimap = widgets:Toggle(shell, Text("Theme minimap button", "Значок Theme у миникарты"),
     function() return not MinimapSettings().hide end, function(show)
         MinimapSettings().hide = not show
         RefreshMinimap()
     end)
-notice:SetPoint("TOPLEFT", minimap, "BOTTOMLEFT", 0, -7)
-local lastWidth
-local function Layout(_, width)
-    if width == lastWidth then return end
-    lastWidth = width
-    local twoColumns = width >= 620
-    local columns = twoColumns and #swatches or 3
-    local swatchWidth = math.max(78, math.floor((width - 44 - (columns - 1) * 6) / columns))
-    for index, entry in ipairs(swatches) do
-        local column, row = (index - 1) % columns, math.floor((index - 1) / columns)
-        entry.button:ClearAllPoints()
-        entry.button:SetWidth(swatchWidth)
-        entry.button:SetPoint("TOPLEFT", section, "BOTTOMLEFT", 10 + column * (swatchWidth + 6), -6 - row * 48)
-    end
-    local offset = twoColumns and -58 or -106
-    local function Place(row, y, column)
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", section, column == "right" and "BOTTOM" or "BOTTOMLEFT",
-            column == "right" and 7 or 10, y)
-        row:SetPoint("TOPRIGHT", section, column == "left" and "BOTTOM" or "BOTTOMRIGHT",
-            column == "left" and -7 or -10, y)
-    end
-    Place(font, offset, twoColumns and "left")
-    Place(heading, twoColumns and offset or offset - 32, twoColumns and "right")
-    Place(language, offset - (twoColumns and 32 or 64))
-    Place(motion, offset - (twoColumns and 64 or 96))
-    Place(minimap, offset - (twoColumns and 96 or 128))
-    shell:SetHeight(twoColumns and 314 or 394)
+
+local function SliderHelp(row, text)
+    row.label:SetPoint("RIGHT", row.slider, "LEFT", -8, 0)
+    return widgets:Help(row, text)
 end
-shell:HookScript("OnSizeChanged", Layout)
-Layout(shell, shell:GetWidth())
+
+local function BackgroundSlider(key, label, help)
+    local row = widgets:SliderRow(shell, label, 0, 100, 5,
+        function() return ns:GetBackgroundStrength(key) end,
+        function(value)
+            ns:SetBackgroundStrength(key, value)
+            RefreshNotice()
+        end, "%")
+    return SliderHelp(row, help)
+end
+
+local tint = BackgroundSlider("tint", Text("Background tint", "Тонировка фона"),
+    Text("Controls how strongly the color scheme tints the stone background.",
+        "Задает, насколько сильно цвета схемы тонируют каменный фон."))
+local texture = BackgroundSlider("texture", Text("Background texture", "Фактура фона"),
+    Text("Controls the visibility of the stone pattern and grain.",
+        "Задает видимость рисунка и зерна камня."))
+
+local draft = ns:GetGlobalWindowOptions()
+local applyRow
+local function DraftSetter(key)
+    return function(value)
+        draft[key] = value
+        if applyRow then applyRow.label:SetText("") end
+    end
+end
+local scale = SliderHelp(widgets:SliderRow(shell, Text("Scale", "Масштаб"), 50, 200, 5,
+    function() return draft.scale end, DraftSetter("scale"), "%"),
+    Text("Sets the scale of the connected Sintezza windows.", "Задает масштаб подключенных окон Sintezza."))
+local opacity = SliderHelp(widgets:SliderRow(shell, Text("Opacity", "Непрозрачность"), 20, 100, 5,
+    function() return draft.opacity end, DraftSetter("opacity"), "%"),
+    Text("Sets how opaque the connected Sintezza windows are.", "Задает непрозрачность подключенных окон Sintezza."))
+local layer = widgets:Help(widgets:ChoiceRow(shell, Text("Layer", "Слой"), {
+    DEFAULT = Text("Default", "По умолчанию"),
+    MEDIUM = Text("Normal", "Обычный"),
+    HIGH = Text("High", "Повышенный"),
+    DIALOG = Text("Dialog", "Диалоговый"),
+}, function() return draft.layer end, DraftSetter("layer"), { DEFAULT = 1, MEDIUM = 2, HIGH = 3, DIALOG = 4 }),
+    Text("Sets which windows appear above the others. Default uses each window's own layer.",
+        "Задает порядок перекрытия. По умолчанию сохраняется штатный слой каждого окна."))
+
+local function ApplyWindows(values, confirmed)
+    local conflicts = ns:GetGlobalWindowConflicts(values)
+    local names = table.concat(conflicts, ", ")
+    if #conflicts > 0 and names ~= confirmed then
+        local question = Text(
+            "These addons have different window settings:\n%s\n\nApply the displayed scale, opacity and layer to all connected windows?",
+            "У этих аддонов заданы другие параметры окон:\n%s\n\nПрименить выбранные масштаб, непрозрачность и слой ко всем подключенным окнам?")
+        widgets:Confirm(question:format(names), function() ApplyWindows(values, names) end)
+        return
+    end
+    ns:ApplyGlobalWindowOptions(values)
+    applyRow.label:SetText(InCombatLockdown() and Text("Applies after combat.", "Применится после боя.")
+        or Text("Applied.", "Применено."))
+end
+
+applyRow = widgets:ActionRow(shell, "", Text("Apply to all", "Применить ко всем"), function()
+    ApplyWindows({ scale = draft.scale, opacity = draft.opacity, layer = draft.layer })
+end, true)
+applyRow.button:SetWidth(154)
+applyRow.label:SetPoint("RIGHT", applyRow.button, "LEFT", -8, 0)
+
+local appearanceRows = { buttonTitle, buttonStyle, tint, texture, motion }
+local interfaceRows = { interfaceTitle, font, heading, language, minimap }
+local windowSizeRows = { scale, opacity }
+local windowLayerRows = { layer, applyRow }
+local lastWidth, lastNotice
+Layout = function(_, width)
+    local showNotice = (notice:GetText() or "") ~= ""
+    if width <= 0 or (width == lastWidth and showNotice == lastNotice) then return end
+    lastWidth, lastNotice = width, showNotice
+    shell:SetWidth(width)
+
+    local inset, gutter = 20, 16
+    local available = math.max(1, width - 2 * inset)
+    local columnWidth = (available - gutter) / 2
+    local twoColumns = columnWidth >= 312
+    local fitting = math.max(1, math.floor((available + 6) / 102))
+    local columns = fitting >= #swatches and #swatches or math.min(fitting, 4)
+    local swatchWidth = math.max(1, math.floor((available - (columns - 1) * 6) / columns))
+
+    local function Place(row, x, y, rowWidth)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", shell, "TOPLEFT", x, y)
+        row:SetWidth(rowWidth)
+    end
+    local function Stack(rows, x, y, rowWidth)
+        for _, row in ipairs(rows) do
+            Place(row, x, y, rowWidth)
+            y = y - row:GetHeight() - 2
+        end
+        return y
+    end
+    local function Arrange(left, right, y)
+        if twoColumns then
+            local leftEnd = Stack(left, inset, y, columnWidth)
+            local rightEnd = Stack(right, inset + columnWidth + gutter, y, columnWidth)
+            return math.min(leftEnd, rightEnd)
+        end
+        local leftEnd = Stack(left, inset, y, available)
+        return Stack(right, inset, leftEnd - 10, available)
+    end
+
+    Place(paletteTitle, inset, -12, available)
+    local offset = -12 - paletteTitle:GetHeight() - 4
+    for index, entry in ipairs(swatches) do
+        local col = (index - 1) % columns
+        local row = math.floor((index - 1) / columns)
+        Place(entry.button, inset + col * (swatchWidth + 6), offset - row * 48, swatchWidth)
+    end
+    offset = offset - math.ceil(#swatches / columns) * 48 - 8
+    offset = Arrange(appearanceRows, interfaceRows, offset) - 12
+    notice:SetShown(showNotice)
+    if showNotice then
+        Place(notice, inset, offset, available)
+        offset = offset - notice:GetHeight() - 8
+    end
+    Place(windows, inset, offset, available)
+    offset = Arrange(windowSizeRows, windowLayerRows, offset - windows:GetHeight() - 2)
+    shell:SetHeight(-offset + 8)
+    scroll:RefreshRange()
+end
+scroll:HookScript("OnSizeChanged", Layout)
+Layout(scroll, scroll:GetWidth())
+window:Bind(panel, { resize = { minWidth = 630, minHeight = 430, maxWidth = 1100, maxHeight = 850 } })
+
 panel:SetScript("OnShow", function()
+    draft = ns:GetGlobalWindowOptions()
     RefreshSwatches()
-    font:Refresh()
-    heading:Refresh()
-    language:Refresh()
-    motion:Refresh(false)
-    minimap:Refresh(false)
+    for _, row in ipairs({ font, heading, language, buttonStyle, motion, minimap, tint, texture, scale, opacity, layer }) do
+        row:Refresh(false)
+    end
+    applyRow.label:SetText("")
     RefreshNotice()
 end)
 
@@ -200,15 +342,17 @@ panel:SetScript("OnEvent", function(self, event, loaded)
     self:UnregisterEvent("ADDON_LOADED")
     ApplyAppearance()
     RefreshSwatches()
-    if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-        category = Settings.RegisterCanvasLayoutCategory(panel, title)
-        Settings.RegisterAddOnCategory(category)
-    end
+    category = ns:RegisterLauncherPage({
+        title = title, icon = ns.icons.Sintezza_Theme,
+        buttonLabel = Text("Open settings", "Открыть настройки"),
+        open = function() ns:OpenSettings() end,
+    })
     RefreshMinimap()
 end)
 
 function ns:OpenSettings()
-    if category and Settings.OpenToCategory then Settings.OpenToCategory(category:GetID()) end
+    panel:Show()
+    panel:Raise()
 end
 
 function ns:RegisterSettingsPage(frame, label)

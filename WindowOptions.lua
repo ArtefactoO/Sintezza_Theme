@@ -1,6 +1,8 @@
 local _, theme = ...
 local Preferences = {}
 local contexts = setmetatable({}, { __mode = "k" })
+local globalContexts = setmetatable({}, { __mode = "k" })
+local globalKeys = { scale = true, opacity = true, layer = true }
 local defaults = { scale = 100, opacity = 100, layer = "DEFAULT", locked = false }
 local layerOrder = { DEFAULT = 1, MEDIUM = 2, HIGH = 3, DIALOG = 4 }
 
@@ -30,18 +32,30 @@ function theme:NewWindowPreferences(getOwner, import, key)
     return prefs
 end
 
-function Preferences:Storage()
+function Preferences:Storage(readOnly)
     local owner = self.getOwner()
     if not owner then return end
-    if type(owner[self.key]) ~= "table" then
-        owner[self.key] = self.import and self.import(owner) or {}
+    local db = owner[self.key]
+    if type(db) ~= "table" then
+        db = self.import and self.import(owner) or {}
+        if not readOnly then owner[self.key] = db end
     end
-    return owner[self.key]
+    return db
+end
+
+local function GlobalStorage()
+    local settings = Sintezza_ThemeDB
+    local storage = type(settings) == "table" and settings.windowDefaults
+    if type(storage) == "table" then return storage end
 end
 
 function Preferences:Get(key)
     local db = self:Storage()
-    if db then return Normalize(key, db[key]) end
+    if db and db[key] ~= nil then return Normalize(key, db[key]) end
+    if globalContexts[self] and globalKeys[key] then
+        local shared = GlobalStorage()
+        return Normalize(key, shared and shared[key])
+    end
     return defaults[key]
 end
 
@@ -49,11 +63,7 @@ function Preferences:CanMove()
     return not InCombatLockdown() and not self:Get("locked")
 end
 
-function Preferences:Set(key, value)
-    local db = self:Storage()
-    if not db then return end
-    db[key] = Normalize(key, value)
-    self:Apply()
+function Preferences:NotifyChanged(key)
     if self.OnChanged then
         if InCombatLockdown() then
             self.changed = self.changed or {}
@@ -62,6 +72,82 @@ function Preferences:Set(key, value)
             self:OnChanged(key)
         end
     end
+end
+
+function Preferences:Set(key, value)
+    local db = self:Storage()
+    if not db then return end
+    db[key] = Normalize(key, value)
+    self:Apply()
+    self:NotifyChanged(key)
+end
+
+function theme:RegisterGlobalWindowPreferences(label, prefs)
+    if type(label) ~= "string" or label == "" or not contexts[prefs] then return end
+    globalContexts[prefs] = label
+    prefs:Apply()
+    return prefs
+end
+
+function theme:GetGlobalWindowOptions()
+    local shared, values = GlobalStorage(), {}
+    for key in pairs(globalKeys) do values[key] = Normalize(key, shared and shared[key]) end
+    return values
+end
+
+local function GlobalValues(values)
+    local normalized = {}
+    if type(values) ~= "table" then return normalized end
+    for key in pairs(globalKeys) do
+        local value = values[key]
+        if key == "layer" then
+            if layerOrder[value] then normalized[key] = value end
+        else
+            local number = tonumber(value)
+            if number and number == number then normalized[key] = Normalize(key, number) end
+        end
+    end
+    return normalized
+end
+
+function theme:GetGlobalWindowConflicts(values)
+    local normalized, conflicts, seen = GlobalValues(values), {}, {}
+    for prefs, label in pairs(globalContexts) do
+        local db = not seen[label] and prefs:Storage(true)
+        if db then
+            for key, value in pairs(normalized) do
+                if db[key] ~= nil and Normalize(key, db[key]) ~= value then
+                    seen[label] = true
+                    conflicts[#conflicts + 1] = label
+                    break
+                end
+            end
+        end
+    end
+    table.sort(conflicts)
+    return conflicts
+end
+
+function theme:ApplyGlobalWindowOptions(values)
+    local normalized = GlobalValues(values)
+    if not next(normalized) then return false end
+    local shared = GlobalStorage()
+    if not shared then
+        shared = {}
+        local settings = self.Fonts:GetSettings()
+        settings.windowDefaults = shared
+    end
+    for key, value in pairs(normalized) do shared[key] = value end
+    -- Only clear overrides in active profile owners that participated in the conflict check.
+    for prefs in pairs(globalContexts) do
+        local db = prefs:Storage()
+        if db then for key in pairs(normalized) do db[key] = nil end end
+    end
+    for prefs in pairs(globalContexts) do
+        prefs:Apply()
+        for key in pairs(normalized) do prefs:NotifyChanged(key) end
+    end
+    return true
 end
 
 local function ResetFramePosition(frame, options)
@@ -75,14 +161,12 @@ local function Dimension(value, frame)
     return value
 end
 
-local function SetResizeBounds(frame, resize)
-    local width, height = Dimension(resize.minWidth, frame), Dimension(resize.minHeight, frame)
-    frame:SetResizeBounds(width, height, resize.maxWidth, resize.maxHeight)
-    return width, height
+local function MinimumSize(frame, resize)
+    return Dimension(resize.minWidth, frame), Dimension(resize.minHeight, frame)
 end
 
 local function RestoreSize(frame, resize, db)
-    local minimumWidth, minimumHeight = SetResizeBounds(frame, resize)
+    local minimumWidth, minimumHeight = MinimumSize(frame, resize)
     local width, height
     if resize.read then
         width, height = resize.read()
@@ -104,7 +188,6 @@ function Preferences:AttachResizeGrip(frame, options)
     resize.height = resize.height or frame:GetHeight()
     resize.minWidth = resize.minWidth or resize.width
     resize.minHeight = resize.minHeight or resize.height
-    frame:SetResizable(true)
     local grip = CreateFrame("Button", nil, frame)
     resize.grip = grip
     grip:SetSize(19, 19)
@@ -132,40 +215,102 @@ function Preferences:AttachResizeGrip(frame, options)
     theme:TrackAppearance(grip, "state", PaintGrip)
     PaintGrip()
 
+    local function UpdateSize(drag)
+        local x, y = GetCursorPosition()
+        local width = Number(drag.width + math.floor((x - drag.x) / drag.scale + .5), drag.minWidth, drag.maxWidth)
+        local height = Number(drag.height + math.floor((drag.y - y) / drag.scale + .5), drag.minHeight, drag.maxHeight)
+        if frame:GetWidth() == width and frame:GetHeight() == height then return end
+        if not drag.points then
+            drag.points = {}
+            for index = 1, frame:GetNumPoints() do
+                drag.points[index] = { frame:GetPoint(index) }
+            end
+            frame:ClearAllPoints()
+            frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", drag.left, drag.top)
+        end
+        frame:SetSize(width, height)
+    end
+
     function resize.stop(save, applying)
-        if not resize.dragging then return end
+        local drag = resize.dragging
+        if not drag then return end
+        grip:SetScript("OnUpdate", nil)
         if InCombatLockdown() then
             resize.stopPending, self.pending = true, true
             return
         end
-        frame:StopMovingOrSizing()
         resize.dragging, resize.stopPending = nil, nil
         PaintGrip()
-        resize.needsLayout = true
-        local db = self:Storage()
-        if save and db and db == resize.profile and self:CanMove() and (not options.active or options.active()) then
-            local width, height = math.floor(frame:GetWidth() + .5), math.floor(frame:GetHeight() + .5)
-            if resize.save then
-                resize.save(width, height)
+        if drag.points then
+            resize.needsLayout = true
+            local db = self:Storage()
+            local width, height = frame:GetWidth(), frame:GetHeight()
+            local changed = width ~= drag.width or height ~= drag.height
+            if changed and save and db == drag.profile and self:CanMove() and (not options.active or options.active()) then
+                width, height = math.floor(width + .5), math.floor(height + .5)
+                if resize.save then
+                    resize.save(width, height)
+                else
+                    if type(db.sizes) ~= "table" then db.sizes = {} end
+                    db.sizes[resize.key] = { width = width, height = height }
+                end
             else
-                if type(db.sizes) ~= "table" then db.sizes = {} end
-                db.sizes[resize.key] = { width = width, height = height }
+                frame:ClearAllPoints()
+                for _, point in ipairs(drag.points) do
+                    frame:SetPoint(unpack(point, 1, 5))
+                end
+                if changed then frame:SetSize(drag.width, drag.height) end
             end
         end
-        resize.profile = nil
         if not applying then self:ApplyTo(frame) end
     end
 
+    local function CanResize(drag)
+        return self:CanMove() and drag.profile == self:Storage()
+            and frame:GetEffectiveScale() == drag.scale and (not options.active or options.active())
+    end
+
     grip:SetScript("OnMouseDown", function(_, button)
-        if button ~= "LeftButton" or not self:CanMove() or (options.active and not options.active()) then return end
+        if button ~= "LeftButton" or resize.dragging or not self:CanMove() or (options.active and not options.active()) then return end
         local db = self:Storage()
-        if not db then return end
-        resize.dragging, resize.profile = true, db
-        frame:StartSizing("BOTTOMRIGHT")
+        local left, top, scale = frame:GetLeft(), frame:GetTop(), frame:GetEffectiveScale()
+        local parentLeft, parentTop = UIParent:GetLeft(), UIParent:GetTop()
+        if not db or not left or not top or not parentLeft or not parentTop or scale <= 0 then return end
+        local ratio = UIParent:GetEffectiveScale() / scale
+        left, top = left - parentLeft * ratio, top - parentTop * ratio
+        local width, height = frame:GetWidth(), frame:GetHeight()
+        local minWidth, minHeight = MinimumSize(frame, resize)
+        local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
+        local maxWidth, maxHeight = screenWidth * ratio - left, screenHeight * ratio + top
+        if options.fit ~= false then
+            maxWidth = math.min(maxWidth, (screenWidth - 24) * ratio)
+            if not options.fitHeight then maxHeight = math.min(maxHeight, (screenHeight - 24) * ratio) end
+        end
+        local x, y = GetCursorPosition()
+        local drag = {
+            profile = db, x = x, y = y, scale = scale, left = left, top = top,
+            width = width, height = height, minWidth = minWidth, minHeight = minHeight,
+            maxWidth = math.max(minWidth, math.min(resize.maxWidth or math.huge, math.max(width, math.floor(maxWidth)))),
+            maxHeight = math.max(minHeight, math.min(resize.maxHeight or math.huge, math.max(height, math.floor(maxHeight)))),
+        }
+        resize.dragging = drag
+        grip:SetScript("OnUpdate", function()
+            if not CanResize(drag) then
+                resize.stop(false)
+            elseif IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then
+                resize.stop(true)
+            else
+                UpdateSize(drag)
+            end
+        end)
         PaintGrip()
     end)
     grip:SetScript("OnMouseUp", function(_, button)
-        if button == "LeftButton" then resize.stop(true) end
+        local drag = resize.dragging
+        if button ~= "LeftButton" or not drag then return end
+        local save = not resize.stopPending and CanResize(drag)
+        if save then UpdateSize(drag) end
+        resize.stop(save)
     end)
     frame:HookScript("OnHide", function() resize.stop(false) end)
 end
@@ -180,7 +325,7 @@ function Preferences:ApplyTo(frame)
     if resize then
         local db = self:Storage()
         local unlocked = active and self:CanMove()
-        if resize.dragging and (resize.stopPending or not unlocked or resize.profile ~= db) then resize.stop(false, true) end
+        if resize.dragging and (resize.stopPending or not unlocked or resize.dragging.profile ~= db) then resize.stop(false, true) end
         resize.grip:SetShown(unlocked)
         if active and not resize.dragging then resized = RestoreSize(frame, resize, db) end
     end
@@ -227,6 +372,9 @@ end
 
 function Preferences:ResetPosition()
     if InCombatLockdown() then self.pendingReset = true; return end
+    for _, options in pairs(self.windows) do
+        if options.resize then options.resize.stop(false, true) end
+    end
     if self.OnReset and self:OnReset() then return end
     for frame, options in pairs(self.windows) do
         if not options.active or options.active() then
@@ -259,9 +407,9 @@ events:RegisterEvent("PLAYER_REGEN_DISABLED")
 events:RegisterEvent("DISPLAY_SIZE_CHANGED")
 events:SetScript("OnEvent", function(_, event)
     for prefs in pairs(contexts) do
-        if event == "PLAYER_REGEN_DISABLED" then
+        if event == "PLAYER_REGEN_DISABLED" or event == "DISPLAY_SIZE_CHANGED" then
             for _, options in pairs(prefs.windows) do
-                if options.resize then options.resize.stop(false) end
+                if options.resize then options.resize.stop(false, true) end
             end
         end
         if prefs.pendingReset then prefs.pendingReset = nil; prefs:ResetPosition() end
@@ -284,14 +432,24 @@ end)
 function theme:CreateWindowOptions(parent, appearance, options)
     local T = appearance or self.Settings
     local W = self:CreateWidgets(T)
-    local panel = W:Card(parent, Text("Window and minimap", "Окно и миникарта"), nil, "panels")
-    local rows, offset = {}, -35
+    local panel = CreateFrame("Frame", nil, parent)
+    local rows, offset = {}, -3
+    local inset = W.CONTROL_INSET
+    if options.heading then
+        local heading = W:Section(panel, Text("Window and minimap", "Окно и миникарта"), nil, "settings")
+        heading:SetPoint("TOPLEFT")
+        heading:SetPoint("TOPRIGHT")
+        heading:SetHeight(heading.headerHeight)
+        offset = -heading.headerHeight
+    end
     local selected = 1
     local function Current() return options.windows[selected].prefs end
-    local function Add(row)
+    local function Add(row, startsGroup)
         T:Font(row.label, 11, "", T.text, "setting")
         local previous = rows[#rows]
-        if previous then
+        if startsGroup then
+            offset = offset - 5
+        elseif previous then
             local separator = previous:CreateTexture(nil, "BACKGROUND")
             separator:SetPoint("BOTTOMLEFT", 0, -1)
             separator:SetPoint("BOTTOMRIGHT", 0, -1)
@@ -299,8 +457,8 @@ function theme:CreateWindowOptions(parent, appearance, options)
             self:SnapTexture(separator)
             self:Tint(separator, "SetColorTexture", T.brass, .13)
         end
-        row:SetPoint("TOPLEFT", panel, "TOPLEFT", W.CARD_INSET, offset)
-        row:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -W.CARD_INSET, offset)
+        row:SetPoint("TOPLEFT", panel, "TOPLEFT", inset, offset)
+        row:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -inset, offset)
         offset = offset - row:GetHeight() - 2
         rows[#rows + 1] = row
     end
@@ -324,7 +482,7 @@ function theme:CreateWindowOptions(parent, appearance, options)
         "Controls which windows appear above this one. Default uses the addon's own layer.",
         "Задает порядок перекрытия окон. По умолчанию используется слой самого аддона.")))
     Add(W:Help(W:Toggle(panel, Text("Lock window", "Закрепить окно"), Get("locked"), Set("locked")),
-        Text("Prevents dragging and resizing the window.", "Блокирует перетаскивание и изменение размера окна.")))
+        Text("Prevents dragging and resizing the window.", "Блокирует перетаскивание и изменение размера окна.")), true)
     Add(W:ActionRow(panel, Text("Window position", "Положение окна"), Text("Reset", "Сбросить"),
         function()
             local prefs = Current()
@@ -335,8 +493,8 @@ function theme:CreateWindowOptions(parent, appearance, options)
             local prefs = Current()
             W:Confirm(Text("Reset window size?", "Сбросить размер окна?"), function() prefs:ResetSize() end)
         end))
-    Add(W:Toggle(panel, Text("Minimap button", "Кнопка у миникарты"), options.getMinimap, options.setMinimap))
-    panel:SetHeight(-offset + 8)
+    Add(W:Toggle(panel, Text("Minimap button", "Кнопка у миникарты"), options.getMinimap, options.setMinimap), true)
+    panel:SetHeight(-offset + 4)
     panel:HookScript("OnShow", Refresh)
     panel.Refresh = Refresh
     return panel

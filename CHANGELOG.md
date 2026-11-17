@@ -1,10 +1,46 @@
 # Changelog
 
-## 1.3.18
+## 1.4.0
+
+- Choose one of five button styles for all connected Sintezza addons. Clipped Corners is the default.
+- Theme settings open in their own window. The three added scratches were removed from the shared slate texture.
+- The settings window uses the standard compact header and a single-page layout with two columns.
+- Unified the styling of settings sections and thin dividers across connected add-ons.
+
+- Fixed long settings help text being clipped in tooltips.
+
+- Diagnostics and window options use the same unframed section heading.
+
+- Window and minimap settings sit directly on the tab background. Embedded sections use a heading with a thin rule.
+
+- Fixed windows jumping to their maximum size while dragging the resize handle.
+
+- Background tint and texture sliders update only their own background layers.
+- Add-on minimap buttons share a left-click window toggle.
+
+- Added Graphite, separate background tint and texture controls, and confirmed bulk changes to window scale, opacity and layer. Shared the settings launcher and list disclosure arrow.
 
 - Updated the project logo and shared in-game icons for Theme, UI, Disenchant, Loot, and Rivals.
 
 ### По-русски
+
+- Добавлен выбор из пяти стилей кнопок для подключенных аддонов Sintezza. По умолчанию используется «Срезанные углы».
+- Настройки Theme открываются в отдельном окне. С общей фактуры сланца убраны три добавленные трещины.
+- В окне настроек общая компактная шапка и одна страница с двумя колонками.
+- Унифицировано оформление секций настроек и тонких разделителей в подключенных аддонах.
+
+- Исправлено обрезание длинных подсказок в настройках.
+
+- Диагностика и настройки окна используют общий заголовок секции с тонкой линией.
+
+- Настройки окна и миникарты размещены прямо на фоне вкладки. Внутри страницы у секции есть заголовок с тонкой линией.
+
+- Исправлен скачок окон до максимального размера при растягивании за уголок.
+
+- Ползунки тонировки и фактуры фона обновляют только свои слои фона.
+- Значки аддонов у миникарты открывают и закрывают окно по ЛКМ.
+
+- Добавлена схема «Графит», отдельные настройки тонировки и фактуры и изменение масштаба, непрозрачности и слоя всех окон с подтверждением. Унифицированы страницы запуска настроек и стрелка раскрытия.
 
 - Обновлены логотип проекта и общие игровые иконки Theme, UI, Disenchant, Loot и Rivals.
 

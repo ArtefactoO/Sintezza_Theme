@@ -183,9 +183,12 @@ function ns:CreateWidgets(T)
         return card
     end
 
-    function W:Section(parent, title, description)
+    function W:Section(parent, title, description, style)
         local section = CreateFrame("Frame", nil, parent)
-        section.title = self:Label(section, string.upper(title or ""), 9, T.muted)
+        local settings = style == "settings"
+        local heading = title or ""
+        section.title = self:Label(section, settings and heading or string.upper(heading),
+            settings and 12 or 9, settings and T.text or T.muted, settings and "setting" or nil)
         section.title:SetPoint("TOPLEFT", section, "TOPLEFT", 0, -4)
         local line = section:CreateTexture(nil, "ARTWORK")
         ns:Tint(line, "SetColorTexture", T.lineSoft)
@@ -204,11 +207,31 @@ function ns:CreateWidgets(T)
             section.description:SetJustifyV("TOP")
         end
         section.headerHeight = section.description:IsShown() and 48 or 25
+        function section:LayoutTitleRule(width)
+            local help = self.helpButton
+            local gap = 10 + (help and help:IsShown() and help:GetWidth() + 6 or 0)
+            local available = (width or self:GetWidth()) - self.title:GetStringWidth() - gap
+            line:SetPoint("LEFT", self.title, "RIGHT", gap, 0)
+            line:SetWidth(math.max(1, available))
+            line:SetShown(available > 1)
+        end
         section:HookScript("OnSizeChanged", function(_, width)
-            line:SetWidth(math.max(1, width - section.title:GetStringWidth() - 10))
+            section:LayoutTitleRule(width)
             section.description:SetWidth(math.max(1, width))
         end)
+        ns:TrackAppearance(section, "state", function(owner) owner:LayoutTitleRule() end)
         return section
+    end
+
+    function W:SettingsDivider(parent, inset)
+        local line = parent:CreateTexture(nil, "ARTWORK")
+        inset = inset or 0
+        line:SetPoint("BOTTOMLEFT", inset, 0)
+        line:SetPoint("BOTTOMRIGHT", -inset, 0)
+        line:SetHeight(1)
+        ns:SnapTexture(line)
+        ns:Tint(line, "SetColorTexture", T.lineSoft)
+        return line
     end
 
     function W:SetAvailable(widget, available)
@@ -237,7 +260,7 @@ function ns:CreateWidgets(T)
         button:SetSize(24, 24)
         local base = palette and { 0.02, 0.028, 0.034, 0.72 } or T.input
         local transparent = { 0, 0, 0, 0 }
-        local paintSurface = controlTheme.ControlSurface(T, button)
+        local paintSurface = controlTheme.ButtonSurface(T, button)
         local paintGlyph = controlTheme.CloseGlyph(T, button)
         button:SetScript("OnClick", onClick)
         local hovered
@@ -301,9 +324,14 @@ function ns:CreateWidgets(T)
         title:SetPoint("LEFT", brand, "RIGHT", 10, hasSubtitle and 6 or 0)
         title:SetWordWrap(false)
         header.title = title
-        if options.version then
-            local version = self:Label(header, "v" .. options.version, 9, T.muted)
-            version:SetPoint("LEFT", title, "RIGHT", 10, -1)
+        local version = options.version
+        if options.addonName then
+            local getMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+            version = getMetadata and getMetadata(options.addonName, "Version") or version
+        end
+        if type(version) == "string" and version ~= "" and not version:find("@", 1, true) then
+            header.version = self:Label(header, "v" .. version, 9, T.muted)
+            header.version:SetPoint("LEFT", title, "RIGHT", 10, -1)
         else
             title:SetPoint("RIGHT", endAnchor, endPoint, -12, 0)
         end
@@ -957,4 +985,34 @@ function ns:CreateWidgets(T)
     end
 
     return W
+end
+
+function ns:RegisterLauncherPage(options)
+    if not (Settings and type(Settings.RegisterCanvasLayoutCategory) == "function"
+        and type(Settings.RegisterAddOnCategory) == "function") then return end
+
+    local theme = options.appearance or self.Settings
+    local widgets = self:CreateWidgets(theme)
+    local panel = CreateFrame("Frame")
+    local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    heading:SetText(options.heading or options.title)
+    local icon = panel:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(24, 24)
+    icon:SetPoint("TOPLEFT", 18, -18)
+    icon:SetTexture(options.icon)
+    heading:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+    theme:Font(heading, 16, "", theme.text, "display")
+
+    local button = widgets:Button(panel, options.buttonLabel, function()
+        if not options.keepSettingsOpen and SettingsPanel and SettingsPanel:IsShown() and not InCombatLockdown() then
+            HideUIPanel(SettingsPanel)
+        end
+        options.open()
+    end)
+    button:SetSize(184, 28)
+    button:SetPoint("TOPLEFT", icon, "BOTTOMLEFT", 0, -16)
+
+    local category = Settings.RegisterCanvasLayoutCategory(panel, options.title)
+    if category then Settings.RegisterAddOnCategory(category) end
+    return category
 end

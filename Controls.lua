@@ -122,10 +122,11 @@ end
 local buttonStyles = setmetatable({}, { __mode = "k" })
 local menuSurfaces = setmetatable({}, { __mode = "k" })
 local textureGetters = { "GetNormalTexture", "GetPushedTexture", "GetDisabledTexture", "GetHighlightTexture" }
-local function RoundTexture(texture, asset, snap)
+local function RoundTexture(texture, asset, snap, margin)
     if not texture.SetTextureSliceMargins then return false end
     if texture:SetTexture(ns.media .. asset, "CLAMP", "CLAMP") == false then return false end
-    texture:SetTextureSliceMargins(5, 5, 5, 5)
+    margin = margin or 5
+    texture:SetTextureSliceMargins(margin, margin, margin, margin)
     if snap then ns:SnapTexture(texture) end
     return true
 end
@@ -208,6 +209,83 @@ function T:ControlSurface(frame)
     end
 end
 
+local buttonLooks = {
+    BRONZE = { asset = "bronze", shade = .75, lift = .055, rimShade = .65 },
+    STEEL = { asset = "steel", shade = .70, lift = .035, rimShade = .48 },
+    BRACKETS = { asset = "brackets", shade = .91, lift = .016, rimShade = .91 },
+    WEDGE = { asset = "wedge", shade = .67, lift = .044, rimShade = .72 },
+    COIN = { asset = "coin", shade = .91, lift = .019, rimShade = .78, stamp = true },
+}
+
+function ns:GetButtonStyle()
+    local id = self.Fonts:GetSettings().buttonStyle
+    return buttonLooks[id] and id or "BRONZE"
+end
+
+ns.activeButtonStyle = ns:GetButtonStyle()
+
+function ns:SetButtonStyle(id)
+    if not buttonLooks[id] then return false end
+    if id == self:GetButtonStyle() then return not self.pendingAppearance end
+    self.Fonts:GetSettings().buttonStyle = id
+    return self:RefreshAppearance()
+end
+
+function T:ButtonSurface(button)
+    local face = button:CreateTexture(nil, "BACKGROUND", nil, -6)
+    local rim = button:CreateTexture(nil, "BACKGROUND", nil, -5)
+    if not face.SetTextureSliceMargins or not rim.SetTextureSliceMargins then
+        return self:ControlSurface(button)
+    end
+    button:SetBackdrop(nil)
+    face:SetAllPoints(button)
+    rim:SetAllPoints(button)
+    local current, stamp
+    return function(background, border, depth, active)
+        local look = buttonLooks[ns.activeButtonStyle]
+        if current ~= look then
+            local asset = "button-" .. look.asset
+            if not RoundTexture(face, asset .. "-face.tga", true, 8) then
+                RoundTexture(face, "control-fill.tga", true)
+            end
+            if not RoundTexture(rim, asset .. "-rim.tga", true, 8) then
+                RoundTexture(rim, "slate-bevel.tga", true)
+            end
+            current = look
+        end
+        local r, g, b, a = unpack(background)
+        local pressed = depth == .22
+        if face.SetGradient and CreateColor then
+            local shade = pressed and .86 or look.shade
+            local lift = pressed and .004 or look.lift * (depth or 1)
+            face:SetVertexColor(1, 1, 1, 1)
+            face:SetGradient("VERTICAL", CreateColor(r * shade, g * shade, b * shade, a or 1),
+                CreateColor(math.min(1, r + lift), math.min(1, g + lift), math.min(1, b + lift), a or 1))
+        else
+            face:SetVertexColor(unpack(background))
+        end
+        if rim.SetGradient and CreateColor then
+            local br, bg, bb, ba = unpack(border)
+            local shade = look.rimShade
+            rim:SetVertexColor(1, 1, 1, 1)
+            rim:SetGradient("VERTICAL", CreateColor(br * shade, bg * shade, bb * shade, ba or 1),
+                CreateColor(br, bg, bb, ba or 1))
+        else
+            rim:SetVertexColor(unpack(border))
+        end
+        if look.stamp and active and not stamp then
+            stamp = button:CreateTexture(nil, "ARTWORK")
+            stamp:SetSize(3, 3)
+            stamp:SetRotation(math.pi / 4)
+            stamp:SetPoint("BOTTOM", button, "BOTTOM", 0, 2)
+        end
+        if stamp then
+            stamp:SetShown(not not (look.stamp and active))
+            if look.stamp and active then stamp:SetColorTexture(unpack(border)) end
+        end
+    end
+end
+
 local mapIconStyle = {
     idle = { { .078, .074, .063, 1 }, { .50, .38, .22, 1 } },
     hover = { { .10, .084, .065, 1 }, { .92, .76, .50, 1 } },
@@ -225,9 +303,9 @@ function T:PaintButton(button, selected)
     if style.mapIcon then
         local state = style.pressed and mapIconStyle.pressed or active and mapIconStyle.active
             or hover and mapIconStyle.hover or mapIconStyle.idle
-        if style.mapState ~= state then
-            style.paint(unpack(state))
-            style.mapState = state
+        if style.mapState ~= state or style.mapLook ~= ns.activeButtonStyle then
+            style.paint(state[1], state[2], style.pressed and .22 or 1, active)
+            style.mapState, style.mapLook = state, ns.activeButtonStyle
         end
         style.mapIndicator:SetShown(not not active)
         style.mapIcon:SetAlpha(enabled and 1 or .45)
@@ -246,7 +324,7 @@ function T:PaintButton(button, selected)
     end
     local border = not enabled and self.lineSoft or active and (self.controlAccentLine or self.accentLine)
         or hover and self.brass or self.controlEdge or self.line
-    style.paint(background, border, not enabled and .4 or style.pressed and .22 or 1)
+    style.paint(background, border, not enabled and .4 or style.pressed and .22 or 1, active)
     local label = style.label or button:GetFontString()
     if label then
         local color = active and self.text
@@ -271,7 +349,7 @@ function T:SkinButton(button, label, fontSize)
         for _, part in ipairs({ "Left", "Middle", "Right" }) do
             if button[part] then button[part]:SetAlpha(0) end
         end
-        style.paint = self:ControlSurface(button)
+        style.paint = self:ButtonSurface(button)
         local function Paint() T.PaintButton(self, button) end
         button:HookScript("OnEnter", function() style.hover = true; Paint() end)
         button:HookScript("OnLeave", function() style.hover, style.pressed = nil, nil; Paint() end)
@@ -357,6 +435,16 @@ function T:DropdownArrow(button, label)
 end
 
 local arrowRotation = { right = 0, down = -math.pi / 2, left = math.pi, up = math.pi / 2 }
+
+local function SetExpanded(arrow, expanded)
+    arrow:SetRotation(expanded and arrowRotation.down or arrowRotation.right)
+end
+
+function T:DisclosureArrow(parent, size, color)
+    local arrow = self:Glyph(parent, "chevron", size or 10, color or self.muted)
+    arrow.SetExpanded = SetExpanded
+    return arrow
+end
 
 function T:ButtonArrow(button, direction)
     if not buttonStyles[button] and not self:SkinButton(button) then return button end

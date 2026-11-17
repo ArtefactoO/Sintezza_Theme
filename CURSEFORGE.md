@@ -20,7 +20,7 @@ Customize the look of supported Sintezza addons from one window.
 
 ### Appearance
 
-Open `/stheme` or click the minimap button to choose Turquoise, Ember, Copper, Old Gold, Ice, or Amethyst. The palette updates the window background and controls across supported addons.
+Open `/stheme` or click the minimap button to choose Turquoise, Ember, Copper, Old Gold, Ice, Amethyst, or Graphite. The palette updates the window background and controls across supported addons. Set background tint and texture separately, or apply window scale, opacity, and layer to all connected addons at once.
 
 Choose separate interface and heading fonts, and toggle decorative effects and animations. English and Russian are available. Game-language mode uses English for other locales. Reload after changing language.
 

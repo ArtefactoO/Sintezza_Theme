@@ -8,13 +8,32 @@ local function Atan2(y, x)
     return 0
 end
 
-function theme:CreateMinimapButton(name, icon, db, onClick, onTooltip)
+function theme:BindMinimapToggle(button, action)
+    button:RegisterForClicks("LeftButtonUp")
+    button:SetScript("OnClick", function(self, mouseButton)
+        if mouseButton ~= "LeftButton" then return end
+        if type(action) == "function" then return action(self, mouseButton) end
+        if action.canToggle and not action.canToggle(self) then return end
+        local window = action.window()
+        if window and window:IsVisible() then
+            if action.close then action.close(window) else window:Hide() end
+        else
+            action.open()
+        end
+    end)
+end
+
+function theme:AddMinimapToggleHint(tooltip)
+    tooltip:AddLine(self:GetLocale() == "ruRU" and "ЛКМ — открыть или закрыть окно."
+        or "Left-click to open or close the window.", 1, 1, 1)
+end
+
+function theme:CreateMinimapButton(name, icon, db, action, onTooltip)
     local map = Minimap
     if not map then return end
     local button = CreateFrame("Button", name .. "MinimapButton", map)
     button:SetSize(31, 31)
     button:SetFrameLevel(map:GetFrameLevel() + 8)
-    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
 
     local background = button:CreateTexture(nil, "BACKGROUND")
@@ -49,7 +68,7 @@ function theme:CreateMinimapButton(name, icon, db, onClick, onTooltip)
         button:SetShown(not db.hide)
     end
 
-    button:SetScript("OnClick", onClick)
+    self:BindMinimapToggle(button, action)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         onTooltip(GameTooltip)

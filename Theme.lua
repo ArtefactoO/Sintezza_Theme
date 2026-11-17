@@ -139,6 +139,8 @@ local palettes = {
         "9fc9e7", "ecf5ff", "aec5d8", "9ce8f5", "213e4f", "1b2c3a" }),
     ARCANE = Palette({ "191323", "130e1b", "38294a", "2a2037", "1a1323", "8b70a8", "4b385e",
         "c5a6df", "faefff", "cfbbdc", "e1bdff", "483056", "2c203b" }),
+    GRAPHITE = Palette({ "131313", "1a1a1a", "303030", "2b2b2b", "1c1c1c", "797979", "505050",
+        "ababab", "f1f1f1", "bdbdbd", "dddddd", "535353", "404040" }),
 }
 
 local stoneTones = {
@@ -148,21 +150,25 @@ local stoneTones = {
     FOREVER = { 72 / 255, 56 / 255, 32 / 255 },
     FROST = { 48 / 255, 72 / 255, 100 / 255 },
     ARCANE = { 84 / 255, 58 / 255, 104 / 255 },
+    GRAPHITE = { .26, .26, .26 },
 }
 
 local controlNeutral = { .135, .119, .105, 1 }
+local controlGraphite = { .15, .15, .15, 1 }
 for id, palette in pairs(palettes) do
+    local graphite = id == "GRAPHITE"
+    local control = graphite and controlGraphite or controlNeutral
     palette.stoneTone = stoneTones[id]
-    palette.chromeShade = Mix({ .080, .073, .065 }, palette.stoneTone, .05)
-    palette.cardLight = Mix({ .267, .227, .176 }, palette.stoneTone, .44, .38)
-    palette.cardShade = Mix({ .129, .106, .082 }, palette.stoneTone, .18, .68)
-    palette.cardHeading = Mix({ .62, .52, .41 }, palette.stoneTone, .12, .26)
-    palette.controlFace = controlNeutral
-    palette.controlEdge = Mix({ .33, .29, .25 }, palette.line, .20)
-    palette.controlActive = Mix(controlNeutral, palette.accentDim, .35)
+    palette.chromeShade = Mix(graphite and { .09, .09, .09 } or { .080, .073, .065 }, palette.stoneTone, .05)
+    palette.cardLight = Mix(graphite and { .30, .30, .30 } or { .267, .227, .176 }, palette.stoneTone, .44, .38)
+    palette.cardShade = Mix(graphite and { .15, .15, .15 } or { .129, .106, .082 }, palette.stoneTone, .18, .68)
+    palette.cardHeading = Mix(graphite and { .55, .55, .55 } or { .62, .52, .41 }, palette.stoneTone, .12, .26)
+    palette.controlFace = control
+    palette.controlEdge = Mix(graphite and { .41, .41, .41 } or { .33, .29, .25 }, palette.line, .20)
+    palette.controlActive = Mix(control, palette.accentDim, .35)
     palette.controlActiveHover = Mix(palette.controlActive, palette.accent, .10)
     palette.controlAccentLine = Mix(palette.accentLine, palette.accent, .14)
-    palette.sliderTrack = Mix({ .24, .21, .18 }, palette.stoneTone, .18)
+    palette.sliderTrack = Mix(graphite and { .42, .42, .42 } or { .24, .21, .18 }, palette.stoneTone, .18)
     palette.sliderThumb = Mix(palette.accent, palette.text, .28)
 end
 
@@ -218,6 +224,76 @@ function ns:LoadPalette()
     end
 end
 
+local backgroundSettings = { tint = "backgroundTintStrength", texture = "backgroundTextureStrength" }
+local activeBackground = { tint = 1, texture = 1 }
+local backgroundRegions = {
+    tint = setmetatable({}, { __mode = "k" }),
+    texture = setmetatable({}, { __mode = "k" }),
+}
+
+local function CanPaint(region)
+    local isSecret = issecretvalue
+    while true do
+        if isSecret and isSecret(region) then return false end
+        if not region then return true end
+
+        if region.IsForbidden then
+            local forbidden = region:IsForbidden()
+            if (isSecret and isSecret(forbidden)) or forbidden then return false end
+        end
+        if region.CanBeAccessedInContext then
+            local accessible = region:CanBeAccessedInContext()
+            if (isSecret and isSecret(accessible)) or not accessible then return false end
+        end
+        region = region.GetParent and region:GetParent()
+    end
+end
+
+local function NormalizeStrength(value)
+    if issecretvalue and issecretvalue(value) then return 100 end
+    local number = tonumber(value)
+    if not number or number ~= number then return 100 end
+    return math.max(0, math.min(100, number))
+end
+
+function ns:GetBackgroundStrength(kind)
+    local key = backgroundSettings[kind]
+    if key then return NormalizeStrength(self.Fonts:GetSettings()[key]) end
+end
+
+local function ApplyBackgroundStrength(kind, strength)
+    activeBackground[kind] = strength
+    for region, baseOpacity in pairs(backgroundRegions[kind]) do
+        if CanPaint(region) then region:SetAlpha(baseOpacity * strength) end
+    end
+end
+
+function ns:SetBackgroundStrength(kind, value)
+    local key = backgroundSettings[kind]
+    if not key then return false end
+    local settings = self.Fonts:GetSettings()
+    value = NormalizeStrength(value)
+    settings[key] = value
+    local strength = value / 100
+    if activeBackground[kind] == strength then return true end
+    if InCombatLockdown and InCombatLockdown() then
+        self.pendingAppearance = true
+        return false
+    end
+    ApplyBackgroundStrength(kind, strength)
+    return true
+end
+
+local function LoadBackgroundStrengths()
+    ApplyBackgroundStrength("tint", ns:GetBackgroundStrength("tint") / 100)
+    ApplyBackgroundStrength("texture", ns:GetBackgroundStrength("texture") / 100)
+end
+
+local function TrackBackgroundOpacity(region, kind, baseOpacity)
+    backgroundRegions[kind][region] = baseOpacity
+    region:SetAlpha(baseOpacity * activeBackground[kind])
+end
+
 function ns:RefreshAppearance()
     if InCombatLockdown and InCombatLockdown() then
         self.pendingAppearance = true
@@ -227,25 +303,10 @@ function ns:RefreshAppearance()
     local settings = self.Fonts:GetSettings()
     self.activeFont = settings.interfaceFont or "THEME"
     self.activeTitleFont = settings.titleFont or "THEME"
+    self.activeButtonStyle = self:GetButtonStyle()
     self.animateControls = settings.animateControls ~= false
     self:LoadPalette()
-    local isSecret = issecretvalue
-    local function CanPaint(region)
-        while true do
-            if isSecret and isSecret(region) then return false end
-            if not region then return true end
-
-            if region.IsForbidden then
-                local forbidden = region:IsForbidden()
-                if (isSecret and isSecret(forbidden)) or forbidden then return false end
-            end
-            if region.CanBeAccessedInContext then
-                local accessible = region:CanBeAccessedInContext()
-                if (isSecret and isSecret(accessible)) or not accessible then return false end
-            end
-            region = region.GetParent and region:GetParent()
-        end
-    end
+    LoadBackgroundStrengths()
     for region, handlers in pairs(refreshers) do
         if CanPaint(region) then
             for key, repaint in pairs(handlers) do
@@ -262,6 +323,7 @@ function ns:RefreshAppearance()
 end
 
 ns:LoadPalette()
+LoadBackgroundStrengths()
 
 local GLYPHS = { overview = 0, panels = 1, combat = 2, party = 3, system = 4, check = 5, pin = 6, chevron = 7 }
 
@@ -303,13 +365,13 @@ end
 
 function Settings:Surface(frame, grainOpacity, lightOpacity, lightTint, grainAsset)
     local grain = TiledSurface(frame, grainAsset or "settings-grain.tga", 128)
-    grain:SetAlpha(grainOpacity)
+    TrackBackgroundOpacity(grain, "texture", grainOpacity)
     if lightOpacity then
         local light = frame:CreateTexture(nil, "BACKGROUND", nil, 2)
         light:SetTexture(MEDIA .. "settings-depth.tga")
         light:SetAllPoints(grain)
         if lightTint then ns:Tint(light, "SetVertexColor", lightTint) end
-        light:SetAlpha(lightOpacity)
+        TrackBackgroundOpacity(light, lightTint and "tint" or "texture", lightOpacity)
     end
 end
 
@@ -451,11 +513,18 @@ local function SlateSurface(frame, tone)
     end
     frame:HookScript("OnSizeChanged", Crop)
     Crop(frame, frame:GetWidth(), frame:GetHeight())
+    TrackBackgroundOpacity(material, "texture", 1)
+    if material.SetDesaturated then
+        local function Paint(target) target:SetDesaturated(ns:GetPalette() == "GRAPHITE") end
+        Paint(material)
+        ns:TrackAppearance(material, "slateDesaturation", Paint)
+    end
 
     local wash = frame:CreateTexture(nil, "BACKGROUND", nil, 2)
     wash:SetAllPoints(material)
     wash:SetTexture(MEDIA .. "stone-wash.tga")
     ns:Tint(wash, "SetVertexColor", tone)
+    TrackBackgroundOpacity(wash, "tint", 1)
 end
 
 local function AddSeamGlint(header, tint)
@@ -540,6 +609,7 @@ local function AddSurfaceLight(theme, frame, layer, alpha)
     light:SetPoint("TOPLEFT", 1, -1)
     light:SetPoint("BOTTOMRIGHT", -1, 1)
     ns:Tint(light, "SetVertexColor", theme.stoneTone, alpha)
+    TrackBackgroundOpacity(light, "tint", 1)
 end
 
 local windowSurfaces = setmetatable({}, { __mode = "k" })

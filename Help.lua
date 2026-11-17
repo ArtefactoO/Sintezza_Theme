@@ -16,7 +16,8 @@ local function CreateHelp()
     T:Backdrop(frame, T.input, T.accentLine)
     local note = frame:CreateFontString(nil, "ARTWORK")
     note:SetPoint("TOPLEFT", PAD, -PAD)
-    note:SetPoint("TOPRIGHT", -PAD, -PAD)
+    note:SetWidth(260 - PAD * 2)
+    note:SetHeight(0)
     note:SetJustifyH("LEFT")
     note:SetWordWrap(true)
     T:Font(note, 11, "", T.text)
@@ -60,6 +61,7 @@ local function Show(owner, pinned)
     tooltip = tooltip or CreateHelp()
     tooltip.owner, tooltip.pinned = owner, pinned
     tooltip.note:SetText(owner.helpText)
+    tooltip:Show()
     Resize(tooltip)
     tooltip:ClearAllPoints()
     local below = owner:GetBottom()
@@ -73,7 +75,6 @@ local function Show(owner, pinned)
         tooltip:RegisterEvent("GLOBAL_MOUSE_DOWN")
     end
     tooltip:RegisterEvent("PLAYER_REGEN_DISABLED")
-    tooltip:Show()
 end
 
 function ns:AttachHelp(row, appearance, note, label)
@@ -112,6 +113,12 @@ function ns:AttachHelp(row, appearance, note, label)
     row:HookScript("OnShow", Layout)
     self:TrackAppearance(button, "state", Layout)
     Layout()
+    if row.LayoutTitleRule then
+        local function LayoutTitleRule() row:LayoutTitleRule() end
+        button:HookScript("OnShow", LayoutTitleRule)
+        button:HookScript("OnHide", LayoutTitleRule)
+        LayoutTitleRule()
+    end
 
     button:SetScript("OnEnter", function(owner) Show(owner, false) end)
     button:SetScript("OnLeave", function(owner) if not (tooltip and tooltip.pinned) then Hide(owner) end end)

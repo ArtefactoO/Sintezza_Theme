@@ -1,4 +1,4 @@
-## Interface: 120100, 120105, 16001
+## Interface: 16001
 ## Title: Sintezza Theme
 ## Author: Sintezza
 ## X-License: MIT

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sintezza Theme · CurseForge</title>
+<style>
+:root { color-scheme: light dark; }
+body { font: 1rem/1.5 system-ui, sans-serif; margin: 0 auto; padding: 1.5rem; max-width: 54rem; }
+h1, h2 { line-height: 1.2; }
+section { margin-top: 1.75rem; }
+table { border-collapse: collapse; }
+th, td { text-align: left; vertical-align: top; padding: .35rem .6rem; border-bottom: 1px solid GrayText; }
+button { font: inherit; padding: .35rem .7rem; }
+textarea { display: block; font: .95rem/1.5 monospace; width: 100%; box-sizing: border-box; resize: vertical; margin: .7rem 0; padding: .6rem; }
+[role="status"] { margin-left: .6rem; }
+#changelog { border-top: 1px solid GrayText; padding-top: .5rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Sintezza Theme</h1>
+<table aria-label="Поля CurseForge">
+<tbody>
+<tr><th scope="row">Game</th><td>World of Warcraft</td></tr>
+<tr><th scope="row">Class</th><td>Addons</td></tr>
+<tr><th scope="row">Flavor and version</th><td>Forever 1.60.1</td></tr>
+<tr><th scope="row">Main category</th><td>Libraries</td></tr>
+<tr><th scope="row">Additional categories</th><td>Artwork</td></tr>
+<tr><th scope="row">CurseForge relations</th><td>None</td></tr>
+<tr><th scope="row">Project license</th><td>MIT. See the repository for third-party notices.</td></tr>
+</tbody>
+</table>
+<section aria-labelledby="summary-title">
+<h2 id="summary-title">Summary</h2>
+<textarea id="summary" aria-labelledby="summary-title" lang="en" rows="2" readonly>Change UI themes, button styles, and fonts across Sintezza addons in WoW Forever.</textarea>
+<button type="button" data-copy="summary">Копировать Summary</button><span role="status"></span>
+</section>
+<section aria-labelledby="description-title">
+<h2 id="description-title">Description</h2>
+<p>Вставь в поле Description в режиме Markdown.</p>
+<textarea id="description" aria-labelledby="description-title" lang="en" rows="15" readonly>Open `/stheme` or click the Theme minimap button to change the look of your Sintezza addons from one window.
+
+![Sintezza Theme settings in Amethyst, with color schemes, appearance controls, and shared window settings](https://raw.githubusercontent.com/ArtefactoO/Sintezza_Theme/main/Docs/CurseForge/01-theme-settings.png)
+
+### Color scheme
+
+![Ember, Ice, Graphite, and Teal applied to the same Theme settings](https://raw.githubusercontent.com/ArtefactoO/Sintezza_Theme/main/Docs/CurseForge/02-palettes.png)
+
+Pick from seven color schemes. The background and controls update in open Sintezza windows, including Vendor.
+
+### Buttons and background
+
+![Four button shapes in Ember and the full list of five styles](https://raw.githubusercontent.com/ArtefactoO/Sintezza_Theme/main/Docs/CurseForge/03-button-styles.png)
+
+Choose a shared shape for buttons and tabs. Adjust background tint and stone texture separately, and toggle animations and effects.
+
+### Interface
+
+Choose separate fonts for interface text and headings. Set the addon language or let Theme follow the game&#x27;s language. Reload the UI after changing languages.
+
+### All addon windows
+
+Apply scale, opacity, and layer to all connected windows. Theme lists the addons with different settings before asking you to confirm.
+
+### Requirements
+
+Sintezza Theme works on its own. Optional [SharedMedia providers](https://www.curseforge.com/wow/addons/sharedmedia) add fonts to the picker.</textarea>
+<button type="button" data-copy="description">Копировать Description</button><span role="status"></span>
+</section>
+<section id="changelog" aria-labelledby="changelog-title">
+<h2 id="changelog-title">Changelog</h2>
+<p>Вставь в отдельное поле Changelog файла выпуска.</p>
+<textarea id="release-notes" aria-labelledby="changelog-title" lang="en" rows="6" readonly>### Changelog
+
+[View the release history on GitHub](https://github.com/ArtefactoO/Sintezza_Theme/blob/main/CHANGELOG.md).
+
+Source, installation details, and credits are available on [GitHub](https://github.com/ArtefactoO/Sintezza_Theme).</textarea>
+<button type="button" data-copy="release-notes">Копировать Changelog</button><span role="status"></span>
+</section>
+</main>
+<script>
+for (const button of document.querySelectorAll("[data-copy]")) {
+  button.addEventListener("click", async () => {
+    const field = document.getElementById(button.dataset.copy);
+    const status = button.nextElementSibling;
+    try {
+      await navigator.clipboard.writeText(field.value);
+      status.textContent = "Скопировано.";
+    } catch {
+      field.focus();
+      field.select();
+      status.textContent = "Текст выделен. Нажми Ctrl+C.";
+    }
+  });
+}
+</script>
+</body>
+</html>

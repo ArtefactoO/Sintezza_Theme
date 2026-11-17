@@ -1,4 +1,7 @@
 package-as: Sintezza_Theme
+ignore:
+  - Tests
+  - Docs/CurseForge
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown

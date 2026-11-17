@@ -11,114 +11,49 @@ function ns:CreateWidgets(T)
 
     T = T or self.Settings
 
-    function W:CloseColorPicker(owner, force)
-        if owner and self.activeColorPickerOwner ~= owner then return end
-        if not owner and not force and not self.activeColorPickerOwner then return end
-        self.activeColorPickerOwner = nil
-        local dandersPicker = _G.DFColorPickerTest
-        if dandersPicker and dandersPicker.IsShown and dandersPicker:IsShown() then
-            pcall(dandersPicker.Hide, dandersPicker)
-        end
-        local picker = ColorPickerFrame
-        if not picker or not picker.IsShown or not picker:IsShown() then return end
-        local cancel = picker.Footer and picker.Footer.CancelButton
-        if cancel and cancel.Click then
-            pcall(cancel.Click, cancel)
-            if not picker:IsShown() then return end
-        end
-        pcall(picker.Hide, picker)
+    function W:Surface(parent, name, role)
+        local frame = CreateFrame("Frame", name, parent, "BackdropTemplate")
+        if role == "window" then T:WindowSurface(frame)
+        elseif role == "sidebar" then T:SidebarSurface(frame)
+        else T:PanelSurface(frame) end
+        return frame
     end
 
-    function W:PrepareColorPicker()
-        self:CloseColorPicker(nil, true)
-        local picker = ColorPickerFrame
-        if not picker then return nil end
-
-        -- Other addons may use the Blizzard picker as a hidden backend and leave
-        -- scale, alpha, mouse state or anchors altered when their custom picker is
-        -- interrupted. Reset the Blizzard picker before opening it again.
-        pcall(picker.Hide, picker)
-        if picker.SetScale then pcall(picker.SetScale, picker, 1) end
-        if picker.SetAlpha then pcall(picker.SetAlpha, picker, 1) end
-        if picker.EnableMouse then pcall(picker.EnableMouse, picker, true) end
-        if picker.RegisterEvent then pcall(picker.RegisterEvent, picker, "GLOBAL_MOUSE_DOWN") end
-        if picker.ClearAllPoints and picker.SetPoint then
-            pcall(picker.ClearAllPoints, picker)
-            pcall(picker.SetPoint, picker, "CENTER", UIParent, "CENTER", 0, 0)
-        end
-        if picker.SetFrameStrata then pcall(picker.SetFrameStrata, picker, "FULLSCREEN_DIALOG") end
-        if picker.SetClampedToScreen then pcall(picker.SetClampedToScreen, picker, true) end
-
-        if not self.colorPickerHideHooked and picker.HookScript then
-            picker:HookScript("OnHide", function()
-                W.activeColorPickerOwner = nil
-            end)
-            self.colorPickerHideHooked = true
-        end
-        return picker
+    function W:DataTexture(parent, role, layer, alpha)
+        local texture = parent:CreateTexture(nil, layer or "ARTWORK")
+        ns:Tint(texture, "SetColorTexture", T[role or "accent"] or T.accent, alpha)
+        return texture
     end
 
-    function W:GetDandersColorPicker()
-        local danders = _G.DandersFrames
-        local gui = danders and danders.GUI
-        if not gui or type(gui.OpenColorPicker) ~= "function" or type(danders.GetGlobalDB) ~= "function" then
-            return nil
-        end
+    function W:DataLine(parent, role, thickness)
+        if not parent.CreateLine then return end
+        local line = parent:CreateLine(nil, "ARTWORK")
+        line:SetThickness(thickness or 2)
+        ns:Tint(line, "SetColorTexture", T[role or "accent"] or T.accent)
+        return line
+    end
 
-        local ok, db = pcall(danders.GetGlobalDB, danders)
-        if not ok or type(db) ~= "table" or not db.colorPickerGlobalOverride then
-            return nil
-        end
-        return gui
+    function W:ProgressBar(parent)
+        local bar = CreateFrame("StatusBar", nil, parent)
+        bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+        ns:Tint(bar, "SetStatusBarColor", T.accent)
+        return bar
+    end
+
+    function W:Tooltip(owner, title, body, anchor)
+        return ns:ShowTooltip(owner, title, body, anchor)
+    end
+
+    function W:CloseColorPicker(owner)
+        ns:CloseColorPicker(self, owner)
+    end
+
+    function W:IsColorPickerOpen()
+        return ns:IsColorPickerOpen()
     end
 
     function W:OpenColorPicker(owner, initialColor, hasAlpha, onChange, onCancel)
-        self:CloseColorPicker(nil, true)
-
-        -- DandersFrames' global override opens Blizzard's picker as an invisible
-        -- backend. On current Retail its Cancel button may leave that backend shown
-        -- after the custom window closes. Its public direct API provides the same UI
-        -- without creating the Blizzard backend.
-        local dandersGUI = self:GetDandersColorPicker()
-        if dandersGUI then
-            self.activeColorPickerOwner = owner
-            local function Finish(color)
-                if color and onChange then onChange(color) end
-                if self.activeColorPickerOwner == owner then self.activeColorPickerOwner = nil end
-            end
-            local function Cancel()
-                if onCancel then onCancel() end
-                if self.activeColorPickerOwner == owner then self.activeColorPickerOwner = nil end
-            end
-            local ok = pcall(dandersGUI.OpenColorPicker, dandersGUI, initialColor, hasAlpha, Finish, Cancel, onChange)
-            if ok then return true end
-            self.activeColorPickerOwner = nil
-        end
-
-        local picker = self:PrepareColorPicker()
-        if not picker or not picker.SetupColorPickerAndShow then return false end
-        local function Changed()
-            local r, g, b = picker:GetColorRGB()
-            local a = hasAlpha and picker.GetColorAlpha and picker:GetColorAlpha() or (initialColor.a or 1)
-            if onChange then onChange({ r = r, g = g, b = b, a = a }) end
-        end
-        local function Cancel()
-            if onCancel then onCancel() end
-            if self.activeColorPickerOwner == owner then self.activeColorPickerOwner = nil end
-        end
-        self.activeColorPickerOwner = owner
-        local ok = pcall(picker.SetupColorPickerAndShow, picker, {
-            r = initialColor.r,
-            g = initialColor.g,
-            b = initialColor.b,
-            opacity = initialColor.a or 1,
-            hasOpacity = hasAlpha,
-            swatchFunc = Changed,
-            opacityFunc = hasAlpha and Changed or nil,
-            cancelFunc = Cancel,
-        })
-        if not ok then self.activeColorPickerOwner = nil end
-        return ok
+        return ns:OpenColorPicker(self, owner, initialColor, hasAlpha, onChange, onCancel)
     end
 
     local function Shift(color, amount, alpha)
@@ -495,12 +430,14 @@ function ns:CreateWidgets(T)
             if strip then width = math.min(138, width) end
             for index, button in ipairs(self.buttons) do
                 button:ClearAllPoints()
-                button:SetPoint("TOP", self, "TOP", 0, -2); button:SetPoint("BOTTOM", self, "BOTTOM", 0, 2); button:SetWidth(width)
-                if index == 1 then button:SetPoint("LEFT", self, "LEFT", inset, 0) else button:SetPoint("LEFT", self.buttons[index - 1], "RIGHT", 2, 0) end
+                button:SetSize(width, math.max(1, self:GetHeight() - 4))
+                if index == 1 then button:SetPoint("TOPLEFT", self, "TOPLEFT", inset, -2)
+                else button:SetPoint("TOPLEFT", self.buttons[index - 1], "TOPRIGHT", 2, 0) end
                 T:PaintButton(button, button.value == getValue())
             end
         end
         frame:HookScript("OnSizeChanged", function(self) self:Refresh() end)
+        frame:HookScript("OnShow", function(self) self:Refresh() end)
         return frame
     end
 
@@ -568,7 +505,8 @@ function ns:CreateWidgets(T)
         editEdge:SetAllPoints()
         ns:Tint(editEdge, "SetVertexColor", T.lineSoft)
         T:Font(edit, 9, "", T.text)
-        local busy
+        local syncDepth = 0
+        local updateFill
         local function Normalize(value)
             value = math.max(minimum, math.min(maximum, tonumber(value) or minimum))
             return math.max(minimum, math.min(maximum, math.floor(value / step + .5) * step))
@@ -576,14 +514,25 @@ function ns:CreateWidgets(T)
         local function Format(value)
             return ("%g%s"):format(value, suffix or "")
         end
+        local function ApplyValue(value)
+            if value ~= Normalize(getValue()) then setValue(value) end
+            return Normalize(getValue())
+        end
         slider:SetScript("OnValueChanged", function(_, value)
-            if busy then return end
+            if syncDepth > 0 then return end
             value = Normalize(value)
             W:SetInputError(row)
-            setValue(value)
-            edit:SetText(edit:HasFocus() and ("%g"):format(value) or Format(value))
+            syncDepth = syncDepth + 1
+            local ok, accepted = pcall(ApplyValue, value)
+            if ok then
+                if slider:GetValue() ~= accepted then slider:SetValue(accepted) end
+                if updateFill then updateFill() end
+                edit:SetText(edit:HasFocus() and ("%g"):format(accepted) or Format(accepted))
+            end
+            syncDepth = syncDepth - 1
+            if not ok then error(accepted, 0) end
         end)
-        local updateFill = T:SkinSlider(slider)
+        updateFill = T:SkinSlider(slider)
         slider.stepFromKeyboard = function(direction)
             slider:SetValue(Normalize(slider:GetValue() + direction * step))
         end
@@ -615,18 +564,18 @@ function ns:CreateWidgets(T)
         function row:SetRange(low, high)
             if low == minimum and high == maximum then return end
             minimum, maximum = low, high
-            busy = true
+            syncDepth = syncDepth + 1
             slider:SetMinMaxValues(low, high)
             updateFill()
-            busy = nil
+            syncDepth = syncDepth - 1
         end
         function row:Refresh()
-            busy = true
             local value = Normalize(getValue())
-            slider:SetValue(value)
+            syncDepth = syncDepth + 1
+            if slider:GetValue() ~= value then slider:SetValue(value) end
             updateFill()
             if not edit:HasFocus() then edit:SetText(Format(value)) end
-            busy = nil
+            syncDepth = syncDepth - 1
         end
         function row:SetAvailable(available)
             self.available = available ~= false
@@ -636,6 +585,7 @@ function ns:CreateWidgets(T)
             if not self.available then edit:ClearFocus() end
         end
         row.slider, row.edit = slider, edit
+        row:HookScript("OnShow", function(self) self:Refresh() end)
         row:SetAvailable(true)
         row:Refresh()
         return row

@@ -325,6 +325,10 @@ panel:SetScript("OnShow", function()
 end)
 
 local category
+local firstRunPending
+local function OpenFirstRun()
+    if firstRunPending and not InCombatLockdown() then ns:OpenSettings() end
+end
 panel:RegisterEvent("ADDON_LOADED")
 panel:RegisterEvent("PLAYER_LOGIN")
 panel:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -332,10 +336,13 @@ panel:SetScript("OnEvent", function(self, event, loaded)
     if event == "PLAYER_LOGIN" then
         self:UnregisterEvent(event)
         RefreshMinimap()
+        firstRunPending = fonts:GetSettings().settingsOpened ~= true
+        OpenFirstRun()
         return
     end
     if event == "PLAYER_REGEN_ENABLED" then
         if ns.pendingAppearance then ApplyAppearance(); RefreshSwatches() end
+        OpenFirstRun()
         return
     end
     if loaded ~= name then return end
@@ -351,8 +358,12 @@ panel:SetScript("OnEvent", function(self, event, loaded)
 end)
 
 function ns:OpenSettings()
-    panel:Show()
+    if not panel:IsShown() then panel:Show() end
     panel:Raise()
+    if panel:IsShown() then
+        fonts:GetSettings().settingsOpened = true
+        firstRunPending = nil
+    end
 end
 
 function ns:RegisterSettingsPage(frame, label)

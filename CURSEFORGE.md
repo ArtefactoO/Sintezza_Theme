@@ -12,23 +12,37 @@
 
 ## Summary
 
-Shared palettes, fonts, and interface controls for Sintezza addons in WoW Forever.
+Change UI themes, button styles, and fonts across Sintezza addons in WoW Forever.
 
 ## Description
 
-Customize the look of supported Sintezza addons from one window.
+Open `/stheme` or click the Theme minimap button to change the look of your Sintezza addons from one window.
 
-### Appearance
+![Sintezza Theme settings in Amethyst, with color schemes, appearance controls, and shared window settings](https://raw.githubusercontent.com/ArtefactoO/Sintezza_Theme/main/Docs/CurseForge/01-theme-settings.png)
 
-Open `/stheme` or click the minimap button to choose Turquoise, Ember, Copper, Old Gold, Ice, Amethyst, or Graphite. The palette updates the window background and controls across supported addons. Set background tint and texture separately, or apply window scale, opacity, and layer to all connected addons at once.
+### Color scheme
 
-Choose separate interface and heading fonts, and toggle decorative effects and animations. English and Russian are available. Game-language mode uses English for other locales. Reload after changing language.
+![Ember, Ice, Graphite, and Teal applied to the same Theme settings](https://raw.githubusercontent.com/ArtefactoO/Sintezza_Theme/main/Docs/CurseForge/02-palettes.png)
 
-Theme supplies shared windows, settings widgets, and data-management tools to Sintezza UI, Vendor, Disenchant, Loot, Rivals, and Execute.
+Pick from seven color schemes. The background and controls update in open Sintezza windows, including Vendor.
+
+### Buttons and background
+
+![Four button shapes in Ember and the full list of five styles](https://raw.githubusercontent.com/ArtefactoO/Sintezza_Theme/main/Docs/CurseForge/03-button-styles.png)
+
+Choose a shared shape for buttons and tabs. Adjust background tint and stone texture separately, and toggle animations and effects.
+
+### Interface
+
+Choose separate fonts for interface text and headings. Set the addon language or let Theme follow the game's language. Reload the UI after changing languages.
+
+### All addon windows
+
+Apply scale, opacity, and layer to all connected windows. Theme lists the addons with different settings before asking you to confirm.
 
 ### Requirements
 
-This addon works on its own. Optional [SharedMedia providers](https://www.curseforge.com/wow/addons/sharedmedia) add fonts to the picker.
+Sintezza Theme works on its own. Optional [SharedMedia providers](https://www.curseforge.com/wow/addons/sharedmedia) add fonts to the picker.
 
 <!-- Changelog field -->
 

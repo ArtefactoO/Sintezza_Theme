@@ -2,9 +2,34 @@ local _, ns = ...
 local T = ns.Settings
 local SIZE, GAP, PAD = 18, 6, 10
 local tooltip
+local CURSOR_GAP = 12
 
 local function Resize(frame)
+    frame.note:SetWidth(240)
+    local width = math.max(140, math.min(260, frame.note:GetStringWidth() + PAD * 2))
+    frame:SetWidth(width)
+    frame.note:SetWidth(width - PAD * 2)
     frame:SetHeight(math.max(14, frame.note:GetStringHeight()) + PAD * 2)
+end
+
+local function PlaceAtCursor(frame)
+    if type(GetCursorPosition) ~= "function" then return false end
+    local x, y = GetCursorPosition()
+    local scale = frame:GetEffectiveScale()
+    if type(x) ~= "number" or type(y) ~= "number" or scale <= 0 then return false end
+    local width, height = frame:GetWidth(), frame:GetHeight()
+    if frame.cursorX == x and frame.cursorY == y and frame.cursorWidth == width and frame.cursorHeight == height
+        and frame.cursorScale == scale then return true end
+    frame.cursorX, frame.cursorY, frame.cursorWidth, frame.cursorHeight = x, y, width, height
+    frame.cursorScale = scale
+    x, y = x / scale, y / scale
+    local screenWidth = UIParent:GetWidth() * UIParent:GetEffectiveScale() / scale
+    local right = x + CURSOR_GAP + width <= screenWidth
+    local below = y - CURSOR_GAP - height >= GAP
+    frame:ClearAllPoints()
+    frame:SetPoint((below and "TOP" or "BOTTOM") .. (right and "LEFT" or "RIGHT"), UIParent, "BOTTOMLEFT",
+        x + (right and CURSOR_GAP or -CURSOR_GAP), y + (below and -CURSOR_GAP or CURSOR_GAP))
+    return true
 end
 
 local function CreateHelp()
@@ -24,9 +49,12 @@ local function CreateHelp()
     frame.note = note
     ns:TrackAppearance(frame, "state", Resize)
     frame:SetScript("OnHide", function(self)
+        self:SetScript("OnUpdate", nil)
         self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
         self:UnregisterEvent("PLAYER_REGEN_DISABLED")
         self.owner, self.pinned = nil, nil
+        self.cursorX, self.cursorY, self.cursorWidth, self.cursorHeight = nil, nil, nil, nil
+        self.cursorScale = nil
     end)
     frame:SetScript("OnEvent", function(self, event)
         if event == "PLAYER_REGEN_DISABLED" or not self.owner or not self.owner:IsMouseOver() then
@@ -48,7 +76,7 @@ function ns:DismissHelp(window)
     return true
 end
 
-local function Show(owner, pinned)
+local function Show(owner, pinned, content, anchor)
     if not owner:IsVisible() then return end
     if tooltip and tooltip.owner == owner then
         if tooltip.pinned then
@@ -60,16 +88,25 @@ local function Show(owner, pinned)
     end
     tooltip = tooltip or CreateHelp()
     tooltip.owner, tooltip.pinned = owner, pinned
-    tooltip.note:SetText(owner.helpText)
+    tooltip.note:SetText(content or owner.helpText)
     tooltip:Show()
     Resize(tooltip)
-    tooltip:ClearAllPoints()
-    local below = owner:GetBottom()
-    local scale = owner:GetEffectiveScale() / tooltip:GetEffectiveScale()
-    if below and below * scale < tooltip:GetHeight() + GAP then
-        tooltip:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", 0, GAP)
+    tooltip:SetScript("OnUpdate", nil)
+    if anchor == "cursor" and PlaceAtCursor(tooltip) then
+        tooltip:SetScript("OnUpdate", function(self)
+            if not self.owner or not self.owner:IsVisible() then self:Hide(); return end
+            PlaceAtCursor(self)
+        end)
     else
-        tooltip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, -GAP)
+        tooltip.cursorX, tooltip.cursorY = nil, nil
+        tooltip:ClearAllPoints()
+        local below = owner:GetBottom()
+        local scale = owner:GetEffectiveScale() / tooltip:GetEffectiveScale()
+        if below and below * scale < tooltip:GetHeight() + GAP then
+            tooltip:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", 0, GAP)
+        else
+            tooltip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, -GAP)
+        end
     end
     if pinned then
         tooltip:RegisterEvent("GLOBAL_MOUSE_DOWN")
@@ -77,11 +114,21 @@ local function Show(owner, pinned)
     tooltip:RegisterEvent("PLAYER_REGEN_DISABLED")
 end
 
+function ns:ShowTooltip(owner, title, body, anchor)
+    if not owner or type(title) ~= "string" or type(body) ~= "string" then return end
+    Show(owner, false, title ~= "" and title .. "\n\n" .. body or body, anchor)
+end
+
+function ns:HideTooltip(owner)
+    Hide(owner)
+end
+
 function ns:AttachHelp(row, appearance, note, label)
     label = label or row.label
     if not label or type(note) ~= "string" or note == "" then return row end
     if row.helpButton then
         row.helpButton.helpText = note
+        if row.helpButton.RefreshPosition then row.helpButton:RefreshPosition() end
         return row
     end
 
@@ -105,10 +152,12 @@ function ns:AttachHelp(row, appearance, note, label)
         end
     end
     local function Layout()
-        local width = math.min(label:GetWidth(), label:GetStringWidth())
+        local available, textWidth = label:GetWidth(), label:GetStringWidth()
+        local width = available > 0 and math.min(available, textWidth) or textWidth
         button:ClearAllPoints()
         button:SetPoint("LEFT", label, "LEFT", width + GAP, 0)
     end
+    button.RefreshPosition = Layout
     row:HookScript("OnSizeChanged", Layout)
     row:HookScript("OnShow", Layout)
     self:TrackAppearance(button, "state", Layout)

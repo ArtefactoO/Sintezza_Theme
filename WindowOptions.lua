@@ -434,7 +434,7 @@ function theme:CreateWindowOptions(parent, appearance, options)
     local W = self:CreateWidgets(T)
     local panel = CreateFrame("Frame", nil, parent)
     local rows, offset = {}, -3
-    local inset = W.CONTROL_INSET
+    local inset = math.max(0, tonumber(options.inset) or W.CONTROL_INSET)
     if options.heading then
         local heading = W:Section(panel, Text("Window and minimap", "Окно и миникарта"), nil, "settings")
         heading:SetPoint("TOPLEFT")
@@ -445,7 +445,7 @@ function theme:CreateWindowOptions(parent, appearance, options)
     local selected = 1
     local function Current() return options.windows[selected].prefs end
     local function Add(row, startsGroup)
-        T:Font(row.label, 11, "", T.text, "setting")
+        T:Font(row.label, 11, "", T.text, options.labelRole or "setting")
         local previous = rows[#rows]
         if startsGroup then
             offset = offset - 5

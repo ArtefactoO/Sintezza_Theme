@@ -44,6 +44,7 @@ local function DecodeCell(value)
 end
 
 function Transfer:EncodeCSV(spec, rows)
+    if ns.PerfBridge then ns.PerfBridge.Count("encode") end
     if type(rows) ~= "table" or #spec.columns + 2 > MAX_COLUMNS then return nil, INVALID end
     if #rows > MAX_ROWS then return nil, TOO_LARGE end
 
@@ -87,6 +88,7 @@ local function ParseCell(input, cursor)
 end
 
 function Transfer:DecodeCSV(spec, input)
+    if ns.PerfBridge then ns.PerfBridge.Count("decode") end
     if type(input) ~= "string" then return nil, INVALID end
     if #input > MAX_BYTES then return nil, TOO_LARGE end
     if input:find("%z") then return nil, INVALID end

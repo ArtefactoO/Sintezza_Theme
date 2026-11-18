@@ -35,8 +35,7 @@ function ns:CreateWidgets(T)
 
     function W:ProgressBar(parent)
         local bar = CreateFrame("StatusBar", nil, parent)
-        bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-        ns:Tint(bar, "SetStatusBarColor", T.accent)
+        ns:SkinProgressBar(bar, T.accent)
         return bar
     end
 

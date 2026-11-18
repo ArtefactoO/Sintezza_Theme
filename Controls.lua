@@ -286,6 +286,22 @@ function T:ButtonSurface(button)
     end
 end
 
+local iconColors = { "text", "muted", "dim", "accent" }
+
+function T:StyleIconButton(button, canStyle, inset)
+    for index, getter in ipairs(textureGetters) do
+        local icon = button[getter] and button[getter](button)
+        if canStyle(icon) then
+            if inset then
+                icon:ClearAllPoints()
+                icon:SetPoint("TOPLEFT", button, "TOPLEFT", inset, -inset)
+                icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -inset, inset)
+            end
+            ns:Tint(icon, "SetVertexColor", self[iconColors[index]])
+        end
+    end
+end
+
 local mapIconStyle = {
     idle = { { .078, .074, .063, 1 }, { .50, .38, .22, 1 } },
     hover = { { .10, .084, .065, 1 }, { .92, .76, .50, 1 } },

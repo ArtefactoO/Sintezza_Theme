@@ -4,7 +4,7 @@
 ## X-License: MIT
 ## Notes: Shared fonts, artwork and controls for Sintezza addons.
 ## Notes-ruRU: Общие шрифты, текстуры и элементы интерфейса для аддонов Sintezza.
-## Version: 1.5.0
+## Version: 1.5.1
 ## IconTexture: Interface\AddOns\Sintezza_Theme\Media\Icons\Sintezza_Theme
 ## SavedVariables: Sintezza_ThemeDB
 ## LoadSavedVariablesFirst: 1

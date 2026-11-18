@@ -42,6 +42,8 @@ Use `widgets:Help(row, text)` for a themed `?` tooltip. For an expandable row, p
 
 Optional consumers can create surfaces through `widgets:Surface(parent, name, role)`, with `window`, `sidebar` or `panel` roles. `widgets:DataTexture(parent, paletteKey, layer)`, `widgets:DataLine(parent, paletteKey, thickness)` and `widgets:ProgressBar(parent)` supply palette-aware marks; the consumer owns their geometry and measured values. Use `widgets:EditBox` and `widgets:ScrollFrame` for input/scroll controls. Anchor the returned scrollbar explicitly to the scroll area. `widgets:Tooltip(owner, title, body)` uses the shared tooltip beside its owner; pass `"cursor"` as a fourth argument to follow the cursor, with edge flipping and UI-scale handling. Call `shared:HideTooltip(owner)` on leave/hide. Cursor tracking runs only while that tooltip is visible; these helpers create no idle polling loop. Bind each standalone dialog to the addon's existing window preferences when scale, opacity and layer should follow its main window.
 
+Sintezza Loot uses `theme:SkinLootRollPopup(frame)` on Forever to apply the shared appearance to Blizzard's group roll popup outside combat. Loot decides when to enable the skin. The popup's item quality and roll actions come from the game.
+
 Use `shared:CreateMinimapButton(name, icon, settings, action, tooltip)` for a left-click toggle. Pass an existing toggle callback or a table with `window` and `open` callbacks and an optional `close` callback. Use `shared:BindMinimapToggle(button, action)` with an existing button.
 
 Use `shared:GetFactionCrest(faction)` for Alliance and Horde emblems. Sintezza UI signals and Rivals faction columns share these textures. Pass the faction token of the character the icon represents.

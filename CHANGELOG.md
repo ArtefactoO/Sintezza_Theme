@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1
+
+- Supply a lightweight textured surface, fonts, item outline, countdown fill, and icon tints for the optional Sintezza Loot roll popup skin.
+- Draw smaller roll symbols within the original Blizzard button hit areas.
+
 ## 1.5.0
 
 - Make shared slider synchronization reentrant, read back accepted values and recover after setter errors; refresh reused help triggers after caption changes. Window-option consumers can select their label role and inset.

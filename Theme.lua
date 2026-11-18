@@ -350,16 +350,19 @@ function Settings:BrassCorners(frame)
     end
 end
 
-local function TiledSurface(frame, asset, tileSize)
+local function TiledSurface(frame, asset, tileSize, anchor)
+    local bounds = anchor or frame
     local grain = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
     grain:SetTexture(MEDIA .. asset, "REPEAT", "REPEAT")
-    grain:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
-    grain:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+    grain:SetPoint("TOPLEFT", bounds, "TOPLEFT", 1, -1)
+    grain:SetPoint("BOTTOMRIGHT", bounds, "BOTTOMRIGHT", -1, 1)
     local function Tile(_, width, height)
+        if issecretvalue and (issecretvalue(width) or issecretvalue(height)) then return end
         grain:SetTexCoord(0, math.max(1, width - 2) / tileSize, 0, math.max(1, height - 2) / tileSize)
     end
-    frame:HookScript("OnSizeChanged", Tile)
-    Tile(frame, frame:GetWidth(), frame:GetHeight())
+    -- Anchored surfaces are fixed-size popups. Do not hook their native layout.
+    if not anchor then frame:HookScript("OnSizeChanged", Tile) end
+    Tile(bounds, bounds:GetWidth(), bounds:GetHeight())
     return grain
 end
 
@@ -499,6 +502,14 @@ local function PaintGradient(texture, bottom, top, bottomAlpha, topAlpha)
     end
 end
 
+local function StoneWash(frame, material, tone)
+    local wash = frame:CreateTexture(nil, "BACKGROUND", nil, 2)
+    wash:SetAllPoints(material)
+    wash:SetTexture(MEDIA .. "stone-wash.tga")
+    ns:Tint(wash, "SetVertexColor", tone)
+    TrackBackgroundOpacity(wash, "tint", 1)
+end
+
 local function SlateSurface(frame, tone)
     local material = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
     material:SetTexture(MEDIA .. "slate-relief.tga")
@@ -520,11 +531,7 @@ local function SlateSurface(frame, tone)
         ns:TrackAppearance(material, "slateDesaturation", Paint)
     end
 
-    local wash = frame:CreateTexture(nil, "BACKGROUND", nil, 2)
-    wash:SetAllPoints(material)
-    wash:SetTexture(MEDIA .. "stone-wash.tga")
-    ns:Tint(wash, "SetVertexColor", tone)
-    TrackBackgroundOpacity(wash, "tint", 1)
+    StoneWash(frame, material, tone)
 end
 
 local function AddSeamGlint(header, tint)
@@ -614,19 +621,102 @@ end
 
 local windowSurfaces = setmetatable({}, { __mode = "k" })
 
-function Settings:WindowSurface(frame)
-    self:Backdrop(frame, self.bg, self.line)
+function Settings:WindowSurface(frame, anchor)
+    if not anchor then self:Backdrop(frame, self.bg, self.line) end
     local art = windowSurfaces[frame]
     if not art then
-        art = CreateFrame("Frame", nil, frame)
-        art:SetAllPoints()
-        art:SetFrameLevel(frame:GetFrameLevel())
-        SlateSurface(art, self.stoneTone)
+        if anchor then
+            local rim = frame:CreateTexture(nil, "BACKGROUND", nil, -3)
+            rim:SetAllPoints(anchor)
+            ns:Tint(rim, "SetColorTexture", self.line)
+            local base = frame:CreateTexture(nil, "BACKGROUND", nil, -2)
+            base:SetPoint("TOPLEFT", anchor, "TOPLEFT", 1, -1)
+            base:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", -1, 1)
+            ns:Tint(base, "SetColorTexture", self.bg)
+            local grain = TiledSurface(frame, "settings-grain.tga", 128, anchor)
+            TrackBackgroundOpacity(grain, "texture", 1)
+            StoneWash(frame, grain, self.stoneTone)
+            art = frame
+        else
+            art = CreateFrame("Frame", nil, frame)
+            art:SetAllPoints()
+            art:SetFrameLevel(frame:GetFrameLevel())
+            SlateSurface(art, self.stoneTone)
+        end
         windowSurfaces[frame] = art
-        if ns.TrackWindow then ns:TrackWindow(frame) end
+        if not anchor and ns.TrackWindow then ns:TrackWindow(frame) end
     end
-    art:Show()
+    if not anchor then art:Show() end
     return art
+end
+
+function ns:SkinProgressBar(bar, color)
+    bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+    self:Tint(bar, "SetStatusBarColor", color)
+end
+
+local skinnedRolls = setmetatable({}, { __mode = "k" })
+
+local function CanStyle(region)
+    return CanPaint(region) and region ~= nil
+end
+
+local function ApplyItemOutline(theme, item, qualityArt)
+    local outline = theme:FrameIcon(item, item.Icon)
+    local red, green, blue
+    local function Paint(target)
+        if red then
+            target:SetVertexColor(red, green, blue, 1)
+        else
+            target:SetVertexColor(unpack(theme.line))
+        end
+    end
+    local function UpdateQuality(_, r, g, b)
+        if not CanStyle(outline) then return end
+        if (issecretvalue and (issecretvalue(r) or issecretvalue(g) or issecretvalue(b)))
+            or type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+            red, green, blue = nil, nil, nil
+        else
+            red, green, blue = r, g, b
+        end
+        Paint(outline)
+    end
+    hooksecurefunc(qualityArt, "SetVertexColor", UpdateQuality)
+    UpdateQuality(qualityArt, qualityArt:GetVertexColor())
+    ns:TrackAppearance(outline, "SetVertexColor", Paint)
+    item.Border:SetAlpha(0)
+end
+
+function Settings:SkinLootRollPopup(frame)
+    if not CanStyle(frame) or skinnedRolls[frame] then return end
+    local timer, item = frame.Timer, frame.IconFrame
+    if not CanStyle(timer) or not CanStyle(item) then return end
+    if not CanStyle(frame.Background) or not CanStyle(frame.Border) or not CanStyle(frame.Name)
+        or not CanStyle(timer.Background) or not CanStyle(item.Icon) or not CanStyle(item.Count) then return end
+
+    -- Blizzard places the timer behind the popup on each show. Put the window
+    -- art on its background layer so it stays below the timer fill and controls.
+    self:WindowSurface(timer, frame)
+
+    frame.Background:SetAlpha(0)
+    frame.Border:SetAlpha(0)
+    timer.Background:SetAlpha(0)
+    ns:SkinProgressBar(timer, self.accent)
+    item.Icon:SetTexCoord(.08, .92, .08, .92)
+    if CanStyle(item.Border) then ApplyItemOutline(self, item, frame.Border) end
+    ns.Fonts:ApplyTheme(frame.Name, 12, "")
+    ns.Fonts:ApplyTheme(item.Count, 10, "OUTLINE")
+    if CanStyle(frame.NeedRollAnim) and CanStyle(frame.NeedRollAnim.RollNumber) then
+        ns.Fonts:ApplyTheme(frame.NeedRollAnim.RollNumber, 32, "OUTLINE")
+    end
+
+    local buttons = frame.LootButtonContainer
+    if CanStyle(buttons) then
+        for _, key in ipairs({ "NeedButton", "PassButton", "GreedButton", "TransmogButton" }) do
+            if CanStyle(buttons[key]) then self:StyleIconButton(buttons[key], CanStyle, 4) end
+        end
+    end
+    skinnedRolls[frame] = true
 end
 
 function Settings:SidebarSurface(frame)

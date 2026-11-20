@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2
+
+- Use the standard Sintezza window background for the loot roll popup and apply palette, tint, and texture changes live.
+
 ## 1.5.1
 
 - Supply a lightweight textured surface, fonts, item outline, countdown fill, and icon tints for the optional Sintezza Loot roll popup skin.

@@ -350,19 +350,17 @@ function Settings:BrassCorners(frame)
     end
 end
 
-local function TiledSurface(frame, asset, tileSize, anchor)
-    local bounds = anchor or frame
+local function TiledSurface(frame, asset, tileSize)
     local grain = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
     grain:SetTexture(MEDIA .. asset, "REPEAT", "REPEAT")
-    grain:SetPoint("TOPLEFT", bounds, "TOPLEFT", 1, -1)
-    grain:SetPoint("BOTTOMRIGHT", bounds, "BOTTOMRIGHT", -1, 1)
+    grain:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
+    grain:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
     local function Tile(_, width, height)
         if issecretvalue and (issecretvalue(width) or issecretvalue(height)) then return end
         grain:SetTexCoord(0, math.max(1, width - 2) / tileSize, 0, math.max(1, height - 2) / tileSize)
     end
-    -- Anchored surfaces are fixed-size popups. Do not hook their native layout.
-    if not anchor then frame:HookScript("OnSizeChanged", Tile) end
-    Tile(bounds, bounds:GetWidth(), bounds:GetHeight())
+    frame:HookScript("OnSizeChanged", Tile)
+    Tile(frame, frame:GetWidth(), frame:GetHeight())
     return grain
 end
 
@@ -510,20 +508,23 @@ local function StoneWash(frame, material, tone)
     TrackBackgroundOpacity(wash, "tint", 1)
 end
 
-local function SlateSurface(frame, tone)
+local function SlateSurface(frame, tone, anchor)
+    local bounds = anchor or frame
     local material = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
     material:SetTexture(MEDIA .. "slate-relief.tga")
-    material:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
-    material:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+    material:SetPoint("TOPLEFT", bounds, "TOPLEFT", 1, -1)
+    material:SetPoint("BOTTOMRIGHT", bounds, "BOTTOMRIGHT", -1, 1)
     local function Crop(_, width, height)
+        if issecretvalue and (issecretvalue(width) or issecretvalue(height)) then return end
         local aspect = math.max(1, width - 2) / math.max(1, height - 2)
         local sourceAspect = 1120 / 800
         local halfU = .5 * math.min(1, aspect / sourceAspect)
         local halfV = .5 * math.min(1, sourceAspect / aspect)
         material:SetTexCoord(.5 - halfU, .5 + halfU, .5 - halfV, .5 + halfV)
     end
-    frame:HookScript("OnSizeChanged", Crop)
-    Crop(frame, frame:GetWidth(), frame:GetHeight())
+    -- The anchored loot popup has a fixed size.
+    if not anchor then frame:HookScript("OnSizeChanged", Crop) end
+    Crop(bounds, bounds:GetWidth(), bounds:GetHeight())
     TrackBackgroundOpacity(material, "texture", 1)
     if material.SetDesaturated then
         local function Paint(target) target:SetDesaturated(ns:GetPalette() == "GRAPHITE") end
@@ -633,16 +634,13 @@ function Settings:WindowSurface(frame, anchor)
             base:SetPoint("TOPLEFT", anchor, "TOPLEFT", 1, -1)
             base:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", -1, 1)
             ns:Tint(base, "SetColorTexture", self.bg)
-            local grain = TiledSurface(frame, "settings-grain.tga", 128, anchor)
-            TrackBackgroundOpacity(grain, "texture", 1)
-            StoneWash(frame, grain, self.stoneTone)
             art = frame
         else
             art = CreateFrame("Frame", nil, frame)
             art:SetAllPoints()
             art:SetFrameLevel(frame:GetFrameLevel())
-            SlateSurface(art, self.stoneTone)
         end
+        SlateSurface(art, self.stoneTone, anchor)
         windowSurfaces[frame] = art
         if not anchor and ns.TrackWindow then ns:TrackWindow(frame) end
     end
